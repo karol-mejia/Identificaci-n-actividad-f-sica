@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visor de Datos de Actividad Física</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Librerías externas -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Análisis de Acelerometría</h1>
+            <div class="upload-section">
+                <label for="fileInput" class="btn">Cargar Archivo (.zip o .csv)</label>
+                <input type="file" id="fileInput" accept=".zip,.csv" style="display: none;">
+                <span id="uploadStatus">Ningún archivo cargado</span>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <aside class="sidebar">
+                <h3>Pacientes</h3>
+                <ul id="patientList">
+                    <li class="empty-msg">Carga un archivo para ver pacientes</li>
+                </ul>
+            </aside>
+
+            <section class="dashboard">
+                <div id="errorBox" class="error-box hidden"></div>
+                
+                <div id="patientInfo" class="info-card hidden">
+                    <h2>Datos del Paciente: <span id="lblId"></span></h2>
+                    <p><strong>Género:</strong> <span id="lblGender"></span></p>
+                    <p><strong>Registros Totales:</strong> <span id="lblRecords"></span></p>
+                    <p><strong>Tiempo Total:</strong> <span id="lblTime"></span> s</p>
+                    
+                    <h3>Resumen de Actividades</h3>
+                    <table id="activityTable">
+                        <thead>
+                            <tr>
+                                <th>Actividad</th>
+                                <th>Registros</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+
+                <div id="chartContainer" class="chart-card hidden">
+                    <h3>Gráfica de Aceleración</h3>
+                    <select id="activityFilter">
+                        <option value="all">Todas las actividades</option>
+                        <option value="1">Sentado en una silla</option>
+                        <option value="2">Acostado</option>
+                        <option value="3">Deambulando</option>
+                    </select>
+                    <canvas id="accelerationChart"></canvas>
+                </div>
+            </section>
+        </div>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
