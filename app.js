@@ -235,3 +235,8 @@ function showError(msg) {
     errorBox.textContent = msg;
     errorBox.classList.remove('hidden');
 }
+
+function showError(msg) {
+    errorBox.textContent = msg;
+    errorBox.classList.remove('hidden');
+}
