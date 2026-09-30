@@ -66,7 +66,7 @@ function extractGender(filename) {
 }
 
 /**
- * Infiere el código de actividad predeterminado si el CSV no contiene columna de etiqueta.
+ * Infiere el código de actividad predeterminado si el archivo no contiene columna de etiqueta.
  */
 function inferActivityFromFilename(filename) {
     const name = filename.toLowerCase();
@@ -107,10 +107,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (patientList) patientList.innerHTML = '';
 
         try {
-            if (file.name.toLowerCase().endsWith('.zip')) {
+            const fileNameLower = file.name.toLowerCase();
+            if (fileNameLower.endsWith('.zip')) {
                 await processZip(file);
             } else {
-                await processCSV(file.name, file);
+                // Procesa archivos .csv, .txt, .text o cualquier archivo de texto plano
+                await processTextFile(file.name, file);
             }
         } catch (err) {
             showError(`Error al procesar el archivo: ${err.message}`);
@@ -128,7 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ============================================================================
-// LECTURA DE ARCHIVOS (ZIP Y CSV)
+// LECTURA DE ARCHIVOS (ZIP, CSV, TXT, TEXT)
 // ============================================================================
 async function processZip(file) {
     if (typeof JSZip === 'undefined') {
@@ -145,9 +147,13 @@ async function processZip(file) {
 
         const filename = relativePath.split('/').pop();
         if (filename && !filename.startsWith('.')) {
-            const fileData = await zipEntry.async("string");
-            if (fileData && fileData.trim().length > 0) {
-                parsePatientData(filename, fileData);
+            const lowerName = filename.toLowerCase();
+            // Acepta .csv, .txt, .text y archivos sin extensión dentro del ZIP
+            if (lowerName.endsWith('.csv') || lowerName.endsWith('.txt') || lowerName.endsWith('.text') || !lowerName.includes('.')) {
+                const fileData = await zipEntry.async("string");
+                if (fileData && fileData.trim().length > 0) {
+                    parsePatientData(filename, fileData);
+                }
             }
         }
     }
@@ -155,7 +161,7 @@ async function processZip(file) {
     finishPatientLoading();
 }
 
-function processCSV(filename, file) {
+function processTextFile(filename, file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = (e) => {
