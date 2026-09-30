@@ -46,17 +46,27 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// Extraer género
+// Extraer género desde el nombre del archivo
 function extractGender(filename) {
-    const cleanName = filename.replace(/\.[^/.]+$/, "").trim();
-    const lastChar = cleanName.slice(-1).toUpperCase();
-    
-    if (lastChar === 'F') return 'Femenino';
-    if (lastChar === 'M') return 'Masculino';
-    return 'Desconocido';
+    const cleanName = filename.toLowerCase();
+    if (cleanName.includes('karol') || cleanName.includes('maria') || cleanName.endsWith('f')) {
+        return 'Femenino';
+    }
+    if (cleanName.endsWith('m')) {
+        return 'Masculino';
+    }
+    return 'Femenino / Desconocido';
 }
 
-// Formatear segundos a texto legible (ej: 2 min 15 s)
+// Deducir código de actividad desde el nombre si no viene en las columnas
+function inferActivityFromFilename(filename) {
+    const name = filename.toLowerCase();
+    if (name.includes('acostad') || name.includes('lying') || name.includes('cama')) return '2';
+    if (name.includes('deambula') || name.includes('camin') || name.includes('paso') || name.includes('marcha')) return '3';
+    return '1'; // Sentado por defecto
+}
+
+// Formatear segundos a texto legible
 function formatDuration(seconds) {
     const mins = Math.floor(seconds / 60);
     const secs = Math.round(seconds % 60);
@@ -64,7 +74,7 @@ function formatDuration(seconds) {
     return `${mins} min ${secs} s`;
 }
 
-// Procesar ZIP con múltiples pacientes
+// Procesar archivo ZIP
 async function processZip(file) {
     if (typeof JSZip === 'undefined') {
         throw new Error("La librería JSZip no está cargada.");
@@ -90,7 +100,7 @@ async function processZip(file) {
     finishPatientLoading();
 }
 
-// Procesar un solo archivo CSV (Paciente Individual)
+// Procesar CSV individual
 function processCSV(filename, file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -121,7 +131,7 @@ function finishPatientLoading() {
     }
 }
 
-// Parsear datos del CSV y calcular métricas de recompensas
+// Analizador flexible adaptado tanto para datasets como para archivos de smartphone (Phyphox)
 function parsePatientData(filename, csvString) {
     if (!csvString || !csvString.trim()) return;
 
@@ -129,19 +139,55 @@ function parsePatientData(filename, csvString) {
     let processedData = [];
     let activityCounts = {};
 
+    const defaultActivity = inferActivityFromFilename(filename);
+
     lines.forEach((line) => {
-        const row = line.trim().split(/[\s,]+/);
+        const cleanLine = line.trim();
+        if (!cleanLine) return;
+
+        // Detectar separador (; o , o espacio)
+        let row;
+        if (cleanLine.includes(';')) {
+            row = cleanLine.split(';');
+        } else if (cleanLine.includes(',')) {
+            row = cleanLine.split(',');
+        } else {
+            row = cleanLine.split(/\s+/);
+        }
+
         if (row.length < 4) return;
 
-        const time = parseFloat(row[0]);
-        const accFrontal = parseFloat(row[1]);
-        const accVertical = parseFloat(row[2]);
-        const accLateral = parseFloat(row[3]);
-        
-        const rawAct = row[8] !== undefined ? row[8] : (row[4] !== undefined ? row[4] : '1');
-        const activityCode = String(rawAct);
+        // Convertir coma decimal a punto y parsear a flotante
+        const parseNum = (val) => {
+            if (!val) return NaN;
+            return parseFloat(String(val).replace(',', '.').trim());
+        };
 
-        if (isNaN(time) || isNaN(accFrontal)) return;
+        const time = parseNum(row[0]);
+        let accFrontal = parseNum(row[1]);
+        let accVertical = parseNum(row[2]);
+        let accLateral = parseNum(row[3]);
+
+        // Si la línea era un encabezado de texto, dar nada
+        if (isNaN(time) || isNaN(accFrontal) || isNaN(accVertical) || isNaN(accLateral)) return;
+
+        // Si los datos están en m/s² (ej: valores cercanos a 9.81), convertir a G (gravedad)
+        if (Math.abs(accVertical) > 3.0 || Math.abs(accFrontal) > 3.0 || Math.abs(accLateral) > 3.0) {
+            accFrontal = accFrontal / 9.80665;
+            accVertical = accVertical / 9.80665;
+            accLateral = accLateral / 9.80665;
+        }
+
+        // Determinar etiqueta de actividad (si existe columna 9 u 8, si no usar la deducida)
+        let activityCode = defaultActivity;
+        if (row[8] !== undefined && !isNaN(parseNum(row[8]))) {
+            activityCode = String(Math.round(parseNum(row[8])));
+        } else if (row[4] !== undefined && !isNaN(parseNum(row[4])) && row.length === 5) {
+            activityCode = String(Math.round(parseNum(row[4])));
+        }
+
+        // Mapear etiquetas lejanas al estándar (1, 2, 3)
+        if (activityCode === '4') activityCode = '3'; // Deambulando
 
         processedData.push({ time, accFrontal, accVertical, accLateral, activityCode });
         activityCounts[activityCode] = (activityCounts[activityCode] || 0) + 1;
@@ -151,11 +197,11 @@ function parsePatientData(filename, csvString) {
         const patientId = filename.replace(/\.[^/.]+$/, "");
         const gender = extractGender(patientId);
         const totalRecords = processedData.length;
-        const totalTime = processedData[processedData.length - 1].time;
+        const totalTime = Math.round(processedData[processedData.length - 1].time - processedData[0].time);
 
         // Cálculo de Puntos y Nivel
         let score = 0;
-        let activeRecords = 0; // Tiempo en 'Deambulando'
+        let activeRecords = 0;
 
         for (const [code, count] of Object.entries(activityCounts)) {
             const config = activityConfig[code] || { ptsPerSec: 0.5 };
@@ -163,7 +209,7 @@ function parsePatientData(filename, csvString) {
             if (code === '3') activeRecords += count;
         }
 
-        const activePercentage = ((activeRecords / totalRecords) * 100).toFixed(1);
+        const activePercentage = parseFloat(((activeRecords / totalRecords) * 100).toFixed(1));
 
         globalPatients[patientId] = {
             id: patientId,
@@ -173,7 +219,7 @@ function parsePatientData(filename, csvString) {
             totalRecords: totalRecords,
             totalTime: totalTime,
             score: Math.round(score),
-            activePercentage: parseFloat(activePercentage)
+            activePercentage: activePercentage
         };
     }
 }
@@ -183,7 +229,6 @@ function renderPatientList() {
     const list = document.getElementById('patientList');
     list.innerHTML = '';
     
-    // Ordenar pacientes por puntaje (Ranking)
     const sortedPatients = Object.values(globalPatients).sort((a, b) => b.score - a.score);
 
     sortedPatients.forEach((patient, index) => {
@@ -208,7 +253,7 @@ function renderPatientList() {
 
 let activePatientId = null;
 
-// Mostrar detalles completos del paciente seleccionado
+// Mostrar detalles del paciente seleccionado
 function displayPatientData(id, rankPosition, totalPatients) {
     activePatientId = id;
     const patient = globalPatients[id];
@@ -221,7 +266,6 @@ function displayPatientData(id, rankPosition, totalPatients) {
     document.getElementById('lblRecords').textContent = patient.totalRecords;
     document.getElementById('lblTime').textContent = `${patient.totalTime} s (${formatDuration(patient.totalTime)})`;
 
-    // Actualizar Encabezado de la Tabla
     const thead = document.querySelector('#activityTable thead');
     if (thead) {
         thead.innerHTML = `
@@ -234,7 +278,6 @@ function displayPatientData(id, rankPosition, totalPatients) {
         `;
     }
 
-    // Llenar datos de la tabla con tiempo, % y puntos
     const tbody = document.querySelector('#activityTable tbody');
     tbody.innerHTML = '';
 
@@ -254,14 +297,11 @@ function displayPatientData(id, rankPosition, totalPatients) {
         tbody.appendChild(tr);
     }
 
-    // Crear o actualizar la Tarjeta de Recompensas
     renderRewardCard(patient, rankPosition, totalPatients);
-
-    // Dibujar gráfica
     drawChart(patient.data, 'all');
 }
 
-// Genera una tarjeta visual de Gamificación y Recompensas
+// Genera tarjeta de Recompensas
 function renderRewardCard(patient, rankPosition, totalPatients) {
     let rewardBox = document.getElementById('rewardCard');
     
@@ -301,8 +341,9 @@ function drawChart(data, filterCode) {
         ? data 
         : data.filter(d => d.activityCode === filterCode);
 
+    // Muestreo para evitar sobrecargar el navegador
     const downsampled = filteredData.filter((_, i) => i % 5 === 0);
-    const labels = downsampled.map(d => d.time);
+    const labels = downsampled.map(d => d.time.toFixed(2));
     
     currentChart = new Chart(ctx, {
         type: 'line',
