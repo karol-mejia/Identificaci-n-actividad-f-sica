@@ -1,14 +1,93 @@
-// Variables globales
+// ============================================================================
+// CONFIGURACIÓN GLOBAL Y ESTADOS
+// ============================================================================
 let globalPatients = {};
 let currentChart = null;
+let activePatientId = null;
 
-// Configuración de actividades, puntos por segundo y colores
+// Configuración de actividades y puntos por segundo
 const activityConfig = {
     '1': { name: 'Sentado en una silla', ptsPerSec: 0.5, color: '#f39c12' },
     '2': { name: 'Acostado', ptsPerSec: 0.0, color: '#95a5a6' },
     '3': { name: 'Deambulando (Caminar)', ptsPerSec: 2.0, color: '#2ecc71' }
 };
 
+// ============================================================================
+// FUNCIONES DE DETECCIÓN INTELIGENTE
+// ============================================================================
+
+/**
+ * Detecta automáticamente el delimitador de columnas (;, ,, tabulación o |)
+ * analizando la consistencia de las primeras filas del archivo.
+ */
+function detectDelimiter(textContent) {
+    const lines = textContent.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+    if (lines.length === 0) return ',';
+
+    // Tomar una muestra de hasta 10 filas
+    const sampleLines = lines.slice(0, 10);
+    const candidates = [';', '\t', '|', ','];
+    
+    let bestDelimiter = ',';
+    let maxScore = -Infinity;
+
+    candidates.forEach(cand => {
+        const counts = sampleLines.map(line => (line.split(cand).length - 1));
+        const total = counts.reduce((acc, val) => acc + val, 0);
+
+        if (total > 0) {
+            const avg = total / counts.length;
+            // Varianza para castigar candidatos con conteo irregular entre líneas
+            const variance = counts.reduce((acc, val) => acc + Math.pow(val - avg, 2), 0) / counts.length;
+            const score = avg - (variance * 1.5);
+            
+            if (score > maxScore) {
+                maxScore = score;
+                bestDelimiter = cand;
+            }
+        }
+    });
+
+    return bestDelimiter;
+}
+
+/**
+ * Extrae el género del participante a partir del nombre del archivo.
+ */
+function extractGender(filename) {
+    const clean = filename.toLowerCase();
+    if (clean.includes('karol') || clean.includes('maria') || clean.includes('ana') || clean.endsWith('f')) {
+        return 'Femenino';
+    }
+    if (clean.includes('juan') || clean.includes('carlos') || clean.includes('pedro') || clean.endsWith('m')) {
+        return 'Masculino';
+    }
+    return 'Desconocido';
+}
+
+/**
+ * Infiere el código de actividad predeterminado si el CSV no contiene columna de etiqueta.
+ */
+function inferActivityFromFilename(filename) {
+    const name = filename.toLowerCase();
+    if (name.includes('acostad') || name.includes('lying') || name.includes('cama')) return '2';
+    if (name.includes('deambula') || name.includes('camin') || name.includes('paso') || name.includes('marcha')) return '3';
+    return '1'; // Sentado por defecto
+}
+
+/**
+ * Convierte segundos a un formato de texto limpio (ej: "35 s" o "2 min 15 s").
+ */
+function formatDuration(seconds) {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.round(seconds % 60);
+    if (mins === 0) return `${secs} s`;
+    return `${mins} min ${secs} s`;
+}
+
+// ============================================================================
+// INICIALIZACIÓN Y EVENTOS DE CARGA
+// ============================================================================
 document.addEventListener('DOMContentLoaded', () => {
     const fileInput = document.getElementById('fileInput');
     const uploadStatus = document.getElementById('uploadStatus');
@@ -20,10 +99,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const file = e.target.files[0];
         if (!file) return;
 
-        uploadStatus.textContent = `Procesando: ${file.name}...`;
+        if (uploadStatus) uploadStatus.textContent = `Procesando: ${file.name}...`;
         hideError();
         globalPatients = {}; 
-        document.getElementById('patientList').innerHTML = '';
+        
+        const patientList = document.getElementById('patientList');
+        if (patientList) patientList.innerHTML = '';
 
         try {
             if (file.name.toLowerCase().endsWith('.zip')) {
@@ -33,7 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (err) {
             showError(`Error al procesar el archivo: ${err.message}`);
-            uploadStatus.textContent = "Error en la carga";
+            if (uploadStatus) uploadStatus.textContent = "Error en la carga";
         }
     });
 
@@ -46,38 +127,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// Extraer género desde el nombre del archivo
-function extractGender(filename) {
-    const cleanName = filename.toLowerCase();
-    if (cleanName.includes('karol') || cleanName.includes('maria') || cleanName.endsWith('f')) {
-        return 'Femenino';
-    }
-    if (cleanName.endsWith('m')) {
-        return 'Masculino';
-    }
-    return 'Femenino / Desconocido';
-}
-
-// Deducir código de actividad desde el nombre si no viene en las columnas
-function inferActivityFromFilename(filename) {
-    const name = filename.toLowerCase();
-    if (name.includes('acostad') || name.includes('lying') || name.includes('cama')) return '2';
-    if (name.includes('deambula') || name.includes('camin') || name.includes('paso') || name.includes('marcha')) return '3';
-    return '1'; // Sentado por defecto
-}
-
-// Formatear segundos a texto legible
-function formatDuration(seconds) {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.round(seconds % 60);
-    if (mins === 0) return `${secs} s`;
-    return `${mins} min ${secs} s`;
-}
-
-// Procesar archivo ZIP
+// ============================================================================
+// LECTURA DE ARCHIVOS (ZIP Y CSV)
+// ============================================================================
 async function processZip(file) {
     if (typeof JSZip === 'undefined') {
-        throw new Error("La librería JSZip no está cargada.");
+        throw new Error("La librería JSZip no está cargada en el proyecto.");
     }
 
     const zip = new JSZip();
@@ -100,7 +155,6 @@ async function processZip(file) {
     finishPatientLoading();
 }
 
-// Procesar CSV individual
 function processCSV(filename, file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -109,7 +163,7 @@ function processCSV(filename, file) {
             finishPatientLoading();
             resolve();
         };
-        reader.onerror = () => reject(new Error("Error de lectura en el archivo."));
+        reader.onerror = () => reject(new Error("No se pudo leer el archivo seleccionado."));
         reader.readAsText(file);
     });
 }
@@ -131,9 +185,14 @@ function finishPatientLoading() {
     }
 }
 
-// Analizador flexible adaptado tanto para datasets como para archivos de smartphone (Phyphox)
+// ============================================================================
+// PROCESAMIENTO Y PARSEO DE DATOS
+// ============================================================================
 function parsePatientData(filename, csvString) {
     if (!csvString || !csvString.trim()) return;
+
+    // 1. Detectar automáticamente el separador de columnas (;, ,, \t, |)
+    const delimiter = detectDelimiter(csvString);
 
     const lines = csvString.trim().split(/\r?\n/);
     let processedData = [];
@@ -141,44 +200,36 @@ function parsePatientData(filename, csvString) {
 
     const defaultActivity = inferActivityFromFilename(filename);
 
+    // Convertidor a número que acepta coma decimal (ej: 0,741 -> 0.741)
+    const parseNum = (val) => {
+        if (val === undefined || val === null) return NaN;
+        return parseFloat(String(val).replace(',', '.').trim());
+    };
+
     lines.forEach((line) => {
         const cleanLine = line.trim();
         if (!cleanLine) return;
 
-        // Detectar separador (; o , o espacio)
-        let row;
-        if (cleanLine.includes(';')) {
-            row = cleanLine.split(';');
-        } else if (cleanLine.includes(',')) {
-            row = cleanLine.split(',');
-        } else {
-            row = cleanLine.split(/\s+/);
-        }
-
+        // Dividir usando el delimitador detectado
+        const row = cleanLine.split(delimiter);
         if (row.length < 4) return;
-
-        // Convertir coma decimal a punto y parsear a flotante
-        const parseNum = (val) => {
-            if (!val) return NaN;
-            return parseFloat(String(val).replace(',', '.').trim());
-        };
 
         const time = parseNum(row[0]);
         let accFrontal = parseNum(row[1]);
         let accVertical = parseNum(row[2]);
         let accLateral = parseNum(row[3]);
 
-        // Si la línea era un encabezado de texto, dar nada
+        // Ignorar filas de encabezado con texto
         if (isNaN(time) || isNaN(accFrontal) || isNaN(accVertical) || isNaN(accLateral)) return;
 
-        // Si los datos están en m/s² (ej: valores cercanos a 9.81), convertir a G (gravedad)
+        // Convertir m/s² a G si los valores corresponden a m/s² (ej: gravedad ~ 9.81)
         if (Math.abs(accVertical) > 3.0 || Math.abs(accFrontal) > 3.0 || Math.abs(accLateral) > 3.0) {
             accFrontal = accFrontal / 9.80665;
             accVertical = accVertical / 9.80665;
             accLateral = accLateral / 9.80665;
         }
 
-        // Determinar etiqueta de actividad (si existe columna 9 u 8, si no usar la deducida)
+        // Obtener la etiqueta de la actividad
         let activityCode = defaultActivity;
         if (row[8] !== undefined && !isNaN(parseNum(row[8]))) {
             activityCode = String(Math.round(parseNum(row[8])));
@@ -186,8 +237,7 @@ function parsePatientData(filename, csvString) {
             activityCode = String(Math.round(parseNum(row[4])));
         }
 
-        // Mapear etiquetas lejanas al estándar (1, 2, 3)
-        if (activityCode === '4') activityCode = '3'; // Deambulando
+        if (activityCode === '4') activityCode = '3';
 
         processedData.push({ time, accFrontal, accVertical, accLateral, activityCode });
         activityCounts[activityCode] = (activityCounts[activityCode] || 0) + 1;
@@ -197,9 +247,10 @@ function parsePatientData(filename, csvString) {
         const patientId = filename.replace(/\.[^/.]+$/, "");
         const gender = extractGender(patientId);
         const totalRecords = processedData.length;
-        const totalTime = Math.round(processedData[processedData.length - 1].time - processedData[0].time);
+        const startTime = processedData[0].time;
+        const endTime = processedData[processedData.length - 1].time;
+        const totalTime = Math.max(1, Math.round(endTime - startTime));
 
-        // Cálculo de Puntos y Nivel
         let score = 0;
         let activeRecords = 0;
 
@@ -224,11 +275,14 @@ function parsePatientData(filename, csvString) {
     }
 }
 
-// Renderizar lista de pacientes con medallas y puntos
+// ============================================================================
+// PRESENTACIÓN DE LA INTERFAZ
+// ============================================================================
 function renderPatientList() {
     const list = document.getElementById('patientList');
+    if (!list) return;
+
     list.innerHTML = '';
-    
     const sortedPatients = Object.values(globalPatients).sort((a, b) => b.score - a.score);
 
     sortedPatients.forEach((patient, index) => {
@@ -246,25 +300,29 @@ function renderPatientList() {
         list.appendChild(li);
     });
 
-    if (sortedPatients.length > 0) {
+    if (sortedPatients.length > 0 && list.children.length > 0) {
         list.children[0].click();
     }
 }
 
-let activePatientId = null;
-
-// Mostrar detalles del paciente seleccionado
 function displayPatientData(id, rankPosition, totalPatients) {
     activePatientId = id;
     const patient = globalPatients[id];
     
-    document.getElementById('patientInfo').classList.remove('hidden');
-    document.getElementById('chartContainer').classList.remove('hidden');
+    const infoBox = document.getElementById('patientInfo');
+    const chartBox = document.getElementById('chartContainer');
+    if (infoBox) infoBox.classList.remove('hidden');
+    if (chartBox) chartBox.classList.remove('hidden');
 
-    document.getElementById('lblId').textContent = patient.id;
-    document.getElementById('lblGender').textContent = patient.gender;
-    document.getElementById('lblRecords').textContent = patient.totalRecords;
-    document.getElementById('lblTime').textContent = `${patient.totalTime} s (${formatDuration(patient.totalTime)})`;
+    const lblId = document.getElementById('lblId');
+    const lblGender = document.getElementById('lblGender');
+    const lblRecords = document.getElementById('lblRecords');
+    const lblTime = document.getElementById('lblTime');
+
+    if (lblId) lblId.textContent = patient.id;
+    if (lblGender) lblGender.textContent = patient.gender;
+    if (lblRecords) lblRecords.textContent = patient.totalRecords;
+    if (lblTime) lblTime.textContent = formatDuration(patient.totalTime);
 
     const thead = document.querySelector('#activityTable thead');
     if (thead) {
@@ -279,29 +337,30 @@ function displayPatientData(id, rankPosition, totalPatients) {
     }
 
     const tbody = document.querySelector('#activityTable tbody');
-    tbody.innerHTML = '';
+    if (tbody) {
+        tbody.innerHTML = '';
 
-    for (const [code, count] of Object.entries(patient.activityCounts)) {
-        const config = activityConfig[code] || { name: `Actividad ${code}`, ptsPerSec: 0.5 };
-        const percent = ((count / patient.totalRecords) * 100).toFixed(1);
-        const timeInSec = Math.round((count / patient.totalRecords) * patient.totalTime);
-        const points = Math.round(count * config.ptsPerSec);
+        for (const [code, count] of Object.entries(patient.activityCounts)) {
+            const config = activityConfig[code] || { name: `Actividad ${code}`, ptsPerSec: 0.5 };
+            const percent = ((count / patient.totalRecords) * 100).toFixed(1);
+            const timeInSec = Math.round((count / patient.totalRecords) * patient.totalTime);
+            const points = Math.round(count * config.ptsPerSec);
 
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td><strong>${config.name}</strong></td>
-            <td>${formatDuration(timeInSec)}</td>
-            <td><span style="background-color: #e8f8f5; padding: 2px 6px; border-radius: 4px; font-weight: bold;">${percent}%</span></td>
-            <td style="color: #27ae60; font-weight: bold;">+${points} pts</td>
-        `;
-        tbody.appendChild(tr);
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><strong>${config.name}</strong></td>
+                <td>${formatDuration(timeInSec)}</td>
+                <td><span style="background-color: #e8f8f5; padding: 2px 6px; border-radius: 4px; font-weight: bold;">${percent}%</span></td>
+                <td style="color: #27ae60; font-weight: bold;">+${points} pts</td>
+            `;
+            tbody.appendChild(tr);
+        }
     }
 
     renderRewardCard(patient, rankPosition, totalPatients);
     drawChart(patient.data, 'all');
 }
 
-// Genera tarjeta de Recompensas
 function renderRewardCard(patient, rankPosition, totalPatients) {
     let rewardBox = document.getElementById('rewardCard');
     
@@ -310,7 +369,7 @@ function renderRewardCard(patient, rankPosition, totalPatients) {
         rewardBox.id = 'rewardCard';
         rewardBox.style.cssText = "margin-top: 15px; padding: 15px; background: #f8f9fa; border-left: 5px solid #2ecc71; border-radius: 6px;";
         const infoContainer = document.getElementById('patientInfo');
-        infoContainer.appendChild(rewardBox);
+        if (infoContainer) infoContainer.appendChild(rewardBox);
     }
 
     let medal = '🥉 Bronce (Nivel Iniciador)';
@@ -327,7 +386,9 @@ function renderRewardCard(patient, rankPosition, totalPatients) {
     `;
 }
 
-// Dibujar gráfica con Chart.js
+// ============================================================================
+// GRÁFICO (CHART.JS)
+// ============================================================================
 function drawChart(data, filterCode) {
     const canvas = document.getElementById('accelerationChart');
     if (!canvas) return;
@@ -341,7 +402,7 @@ function drawChart(data, filterCode) {
         ? data 
         : data.filter(d => d.activityCode === filterCode);
 
-    // Muestreo para evitar sobrecargar el navegador
+    // Muestreo para mantener agilidad en la navegación
     const downsampled = filteredData.filter((_, i) => i % 5 === 0);
     const labels = downsampled.map(d => d.time.toFixed(2));
     
@@ -365,6 +426,9 @@ function drawChart(data, filterCode) {
     });
 }
 
+// ============================================================================
+// MANEJO DE ERRORES Y UI
+// ============================================================================
 function showError(msg) {
     const errorBox = document.getElementById('errorBox');
     if (errorBox) {
