@@ -85,6 +85,20 @@ function formatDuration(seconds) {
     return `${mins} min ${secs} s`;
 }
 
+// Función para limpiar y extraer el nombre real del paciente desde el nombre del archivo
+function obtenerNombrePaciente(filename) {
+    let sinExtension = filename.replace(/\.[^/.]+$/, "");
+    
+    // Separa por guion bajo, medio o largo para aislar el nombre del paciente
+    let separadores = /[_–-]/;
+    if (separadores.test(sinExtension)) {
+        let partes = sinExtension.split(separadores);
+        return partes[0].trim(); // Retorna "Mejia Karol"
+    }
+    
+    return sinExtension.trim();
+}
+
 // ============================================================================
 // INICIALIZACIÓN Y EVENTOS DE CARGA
 // ============================================================================
@@ -197,16 +211,14 @@ function finishPatientLoading() {
 function parsePatientData(filename, csvString) {
     if (!csvString || !csvString.trim()) return;
 
-    // 1. Detectar automáticamente el separador de columnas (;, ,, \t, |)
+    // 1. Detectar automáticamente el separador de columnas
     const delimiter = detectDelimiter(csvString);
-
     const lines = csvString.trim().split(/\r?\n/);
     let processedData = [];
     let activityCounts = {};
 
     const defaultActivity = inferActivityFromFilename(filename);
 
-    // Convertidor a número que acepta coma decimal (ej: 0,741 -> 0.741)
     const parseNum = (val) => {
         if (val === undefined || val === null) return NaN;
         return parseFloat(String(val).replace(',', '.').trim());
@@ -216,7 +228,6 @@ function parsePatientData(filename, csvString) {
         const cleanLine = line.trim();
         if (!cleanLine) return;
 
-        // Dividir usando el delimitador detectado
         const row = cleanLine.split(delimiter);
         if (row.length < 4) return;
 
@@ -225,17 +236,14 @@ function parsePatientData(filename, csvString) {
         let accVertical = parseNum(row[2]);
         let accLateral = parseNum(row[3]);
 
-        // Ignorar filas de encabezado con texto
         if (isNaN(time) || isNaN(accFrontal) || isNaN(accVertical) || isNaN(accLateral)) return;
 
-        // Convertir m/s² a G si los valores corresponden a m/s² (ej: gravedad ~ 9.81)
         if (Math.abs(accVertical) > 3.0 || Math.abs(accFrontal) > 3.0 || Math.abs(accLateral) > 3.0) {
             accFrontal = accFrontal / 9.80665;
             accVertical = accVertical / 9.80665;
             accLateral = accLateral / 9.80665;
         }
 
-        // Obtener la etiqueta de la actividad
         let activityCode = defaultActivity;
         if (row[8] !== undefined && !isNaN(parseNum(row[8]))) {
             activityCode = String(Math.round(parseNum(row[8])));
@@ -250,202 +258,51 @@ function parsePatientData(filename, csvString) {
     });
 
     if (processedData.length > 0) {
-        const patientId = filename.replace(/\.[^/.]+$/, "");
+        // Obtenemos el nombre base unificado (ej: "Mejia Karol")
+        const patientId = obtenerNombrePaciente(filename);
         const gender = extractGender(patientId);
-        const totalRecords = processedData.length;
-        const startTime = processedData[0].time;
-        const endTime = processedData[processedData.length - 1].time;
-        const totalTime = Math.max(1, Math.round(endTime - startTime));
+
+        // Si el paciente aún no está en el objeto global, lo inicializamos
+        if (!globalPatients[patientId]) {
+            globalPatients[patientId] = {
+                id: patientId,
+                gender: gender,
+                data: [],
+                activityCounts: {},
+                totalRecords: 0,
+                totalTime: 0,
+                score: 0,
+                activePercentage: 0
+            };
+        }
+
+        const patient = globalPatients[patientId];
+        
+        // Acumulamos los nuevos datos del archivo a los ya existentes del paciente
+        patient.data = patient.data.concat(processedData);
+
+        // Combinamos los conteos de actividad
+        for (const [code, count] of Object.entries(activityCounts)) {
+            patient.activityCounts[code] = (patient.activityCounts[code] || 0) + count;
+        }
+
+        patient.totalRecords += processedData.length;
+
+        // Recalculamos métricas globales del paciente unificado
+        const startTime = patient.data[0].time;
+        const endTime = patient.data[patient.data.length - 1].time;
+        patient.totalTime = Math.max(1, Math.round(endTime - startTime));
 
         let score = 0;
         let activeRecords = 0;
 
-        for (const [code, count] of Object.entries(activityCounts)) {
+        for (const [code, count] of Object.entries(patient.activityCounts)) {
             const config = activityConfig[code] || { ptsPerSec: 0.5 };
             score += count * config.ptsPerSec;
             if (code === '3') activeRecords += count;
         }
 
-        const activePercentage = parseFloat(((activeRecords / totalRecords) * 100).toFixed(1));
-
-        globalPatients[patientId] = {
-            id: patientId,
-            gender: gender,
-            data: processedData,
-            activityCounts: activityCounts,
-            totalRecords: totalRecords,
-            totalTime: totalTime,
-            score: Math.round(score),
-            activePercentage: activePercentage
-        };
-    }
-}
-
-// ============================================================================
-// PRESENTACIÓN DE LA INTERFAZ
-// ============================================================================
-function renderPatientList() {
-    const list = document.getElementById('patientList');
-    if (!list) return;
-
-    list.innerHTML = '';
-    const sortedPatients = Object.values(globalPatients).sort((a, b) => b.score - a.score);
-
-    sortedPatients.forEach((patient, index) => {
-        const li = document.createElement('li');
-        let badge = '🥉';
-        if (index === 0) badge = '🥇';
-        else if (index === 1) badge = '🥈';
-
-        li.innerHTML = `<span>${badge} 👤 ${patient.id}</span> <strong style="color: #27ae60;">${patient.score} pts</strong>`;
-        li.onclick = () => {
-            document.querySelectorAll('#patientList li').forEach(el => el.classList.remove('active'));
-            li.classList.add('active');
-            displayPatientData(patient.id, index + 1, sortedPatients.length);
-        };
-        list.appendChild(li);
-    });
-
-    if (sortedPatients.length > 0 && list.children.length > 0) {
-        list.children[0].click();
-    }
-}
-
-function displayPatientData(id, rankPosition, totalPatients) {
-    activePatientId = id;
-    const patient = globalPatients[id];
-    
-    const infoBox = document.getElementById('patientInfo');
-    const chartBox = document.getElementById('chartContainer');
-    if (infoBox) infoBox.classList.remove('hidden');
-    if (chartBox) chartBox.classList.remove('hidden');
-
-    const lblId = document.getElementById('lblId');
-    const lblGender = document.getElementById('lblGender');
-    const lblRecords = document.getElementById('lblRecords');
-    const lblTime = document.getElementById('lblTime');
-
-    if (lblId) lblId.textContent = patient.id;
-    if (lblGender) lblGender.textContent = patient.gender;
-    if (lblRecords) lblRecords.textContent = patient.totalRecords;
-    if (lblTime) lblTime.textContent = formatDuration(patient.totalTime);
-
-    const thead = document.querySelector('#activityTable thead');
-    if (thead) {
-        thead.innerHTML = `
-            <tr>
-                <th>Actividad</th>
-                <th>Tiempo Estimado</th>
-                <th>Porcentaje (%)</th>
-                <th>Puntos Ganados</th>
-            </tr>
-        `;
-    }
-
-    const tbody = document.querySelector('#activityTable tbody');
-    if (tbody) {
-        tbody.innerHTML = '';
-
-        for (const [code, count] of Object.entries(patient.activityCounts)) {
-            const config = activityConfig[code] || { name: `Actividad ${code}`, ptsPerSec: 0.5 };
-            const percent = ((count / patient.totalRecords) * 100).toFixed(1);
-            const timeInSec = Math.round((count / patient.totalRecords) * patient.totalTime);
-            const points = Math.round(count * config.ptsPerSec);
-
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td><strong>${config.name}</strong></td>
-                <td>${formatDuration(timeInSec)}</td>
-                <td><span style="background-color: #e8f8f5; padding: 2px 6px; border-radius: 4px; font-weight: bold;">${percent}%</span></td>
-                <td style="color: #27ae60; font-weight: bold;">+${points} pts</td>
-            `;
-            tbody.appendChild(tr);
-        }
-    }
-
-    renderRewardCard(patient, rankPosition, totalPatients);
-    drawChart(patient.data, 'all');
-}
-
-function renderRewardCard(patient, rankPosition, totalPatients) {
-    let rewardBox = document.getElementById('rewardCard');
-    
-    if (!rewardBox) {
-        rewardBox = document.createElement('div');
-        rewardBox.id = 'rewardCard';
-        rewardBox.style.cssText = "margin-top: 15px; padding: 15px; background: #f8f9fa; border-left: 5px solid #2ecc71; border-radius: 6px;";
-        const infoContainer = document.getElementById('patientInfo');
-        if (infoContainer) infoContainer.appendChild(rewardBox);
-    }
-
-    let medal = '🥉 Bronce (Nivel Iniciador)';
-    if (patient.activePercentage >= 35) medal = '🥇 Oro (Atleta Destacado)';
-    else if (patient.activePercentage >= 15) medal = '🥈 Plata (Activo en Marcha)';
-
-    const rankText = totalPatients > 1 ? `| <strong>Posición:</strong> #${rankPosition} de ${totalPatients}` : '';
-
-    rewardBox.innerHTML = `
-        <h3 style="margin-top: 0; color: #2c3e50;">🏆 Sistema de Recompensas</h3>
-        <p style="margin: 5px 0;"><strong>Puntaje de Actividad:</strong> <span style="font-size: 1.2em; color: #27ae60; font-weight: bold;">${patient.score} Puntos</span> ${rankText}</p>
-        <p style="margin: 5px 0;"><strong>Insignia Obtenida:</strong> ${medal}</p>
-        <p style="margin: 5px 0;"><strong>Tiempo en Movimiento (Deambulando):</strong> ${patient.activePercentage}% del total</p>
-    `;
-}
-
-// ============================================================================
-// GRÁFICO (CHART.JS)
-// ============================================================================
-function drawChart(data, filterCode) {
-    const canvas = document.getElementById('accelerationChart');
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    
-    if (currentChart) {
-        currentChart.destroy();
-    }
-
-    const filteredData = filterCode === 'all' 
-        ? data 
-        : data.filter(d => d.activityCode === filterCode);
-
-    // Muestreo para mantener agilidad en la navegación
-    const downsampled = filteredData.filter((_, i) => i % 5 === 0);
-    const labels = downsampled.map(d => d.time.toFixed(2));
-    
-    currentChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [
-                { label: 'Frontal (G)', data: downsampled.map(d => d.accFrontal), borderColor: '#e74c3c', borderWidth: 1, pointRadius: 0 },
-                { label: 'Vertical (G)', data: downsampled.map(d => d.accVertical), borderColor: '#3498db', borderWidth: 1, pointRadius: 0 },
-                { label: 'Lateral (G)', data: downsampled.map(d => d.accLateral), borderColor: '#2ecc71', borderWidth: 1, pointRadius: 0 }
-            ]
-        },
-        options: {
-            responsive: true,
-            scales: {
-                x: { title: { display: true, text: 'Tiempo (s)' } },
-                y: { title: { display: true, text: 'Aceleración (G)' } }
-            }
-        }
-    });
-}
-
-// ============================================================================
-// MANEJO DE ERRORES Y UI
-// ============================================================================
-function showError(msg) {
-    const errorBox = document.getElementById('errorBox');
-    if (errorBox) {
-        errorBox.textContent = msg;
-        errorBox.classList.remove('hidden');
-    }
-}
-
-function hideError() {
-    const errorBox = document.getElementById('errorBox');
-    if (errorBox) {
-        errorBox.classList.add('hidden');
+        patient.score = Math.round(score);
+        patient.activePercentage = parseFloat(((activeRecords / patient.totalRecords) * 100).toFixed(1));
     }
 }
