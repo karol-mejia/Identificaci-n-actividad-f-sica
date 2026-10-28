@@ -252,15 +252,9 @@ function parsePatientData(filename, csvString) {
             accLateral = accLateral / 9.80665;
         }
 
+        // Usar directamente la actividad inferida del nombre del archivo (ej. acostada, marcha, etc.)
         let activityCode = defaultActivity;
-        if (row[8] !== undefined && !isNaN(parseNum(row[8]))) {
-            activityCode = String(Math.round(parseNum(row[8])));
-        } else if (row[4] !== undefined && !isNaN(parseNum(row[4])) && row.length === 5) {
-            activityCode = String(Math.round(parseNum(row[4])));
-        }
-
-        if (activityCode === '4') activityCode = '3';
-
+        
         processedData.push({ time, accFrontal, accVertical, accLateral, activityCode });
         activityCounts[activityCode] = (activityCounts[activityCode] || 0) + 1;
     });
