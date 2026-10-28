@@ -13,8 +13,35 @@ const activityConfig = {
 };
 
 // ============================================================================
-// FUNCIONES DE DETECCIÓN INTELIGENTE
+// FUNCIONES DE DETECCIÓN INTELIGENTE Y UNIFICACIÓN
 // ============================================================================
+
+/**
+ * Limpia y extrae el nombre real del paciente desde el nombre del archivo,
+ * eliminando sufijos de actividades (ej. "Mejia Karol_acostada" -> "Mejia Karol").
+ */
+function obtenerNombrePaciente(filename) {
+    let sinExtension = filename.replace(/\.[^/.]+$/, "").trim();
+    let lowerName = sinExtension.toLowerCase();
+    
+    const actividadesConocidas = ['sentada', 'acostada', 'marcha', 'bipeda', 'reposo', 'caminando', 'caminar', 'deambulando'];
+    
+    for (let act of actividadesConocidas) {
+        if (lowerName.includes(act)) {
+            let index = lowerName.indexOf(act);
+            let nombreLimpio = sinExtension.substring(0, index).trim();
+            return nombreLimpio.replace(/[_–-]+$/, "").trim();
+        }
+    }
+    
+    let separadores = /[_–-]/;
+    if (separadores.test(sinExtension)) {
+        let partes = sinExtension.split(separadores);
+        return partes[0].trim();
+    }
+    
+    return sinExtension;
+}
 
 /**
  * Detecta automáticamente el delimitador de columnas (;, ,, tabulación o |)
@@ -24,7 +51,6 @@ function detectDelimiter(textContent) {
     const lines = textContent.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
     if (lines.length === 0) return ',';
 
-    // Tomar una muestra de hasta 10 filas
     const sampleLines = lines.slice(0, 10);
     const candidates = [';', '\t', '|', ','];
     
@@ -37,7 +63,6 @@ function detectDelimiter(textContent) {
 
         if (total > 0) {
             const avg = total / counts.length;
-            // Varianza para castigar candidatos con conteo irregular entre líneas
             const variance = counts.reduce((acc, val) => acc + Math.pow(val - avg, 2), 0) / counts.length;
             const score = avg - (variance * 1.5);
             
@@ -85,20 +110,6 @@ function formatDuration(seconds) {
     return `${mins} min ${secs} s`;
 }
 
-// Función para limpiar y extraer el nombre real del paciente desde el nombre del archivo
-function obtenerNombrePaciente(filename) {
-    let sinExtension = filename.replace(/\.[^/.]+$/, "");
-    
-    // Separa por guion bajo, medio o largo para aislar el nombre del paciente
-    let separadores = /[_–-]/;
-    if (separadores.test(sinExtension)) {
-        let partes = sinExtension.split(separadores);
-        return partes[0].trim(); // Retorna "Mejia Karol"
-    }
-    
-    return sinExtension.trim();
-}
-
 // ============================================================================
 // INICIALIZACIÓN Y EVENTOS DE CARGA
 // ============================================================================
@@ -125,7 +136,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (fileNameLower.endsWith('.zip')) {
                 await processZip(file);
             } else {
-                // Procesa archivos .csv, .txt, .text o cualquier archivo de texto plano
                 await processTextFile(file.name, file);
             }
         } catch (err) {
@@ -162,7 +172,6 @@ async function processZip(file) {
         const filename = relativePath.split('/').pop();
         if (filename && !filename.startsWith('.')) {
             const lowerName = filename.toLowerCase();
-            // Acepta .csv, .txt, .text y archivos sin extensión dentro del ZIP
             if (lowerName.endsWith('.csv') || lowerName.endsWith('.txt') || lowerName.endsWith('.text') || !lowerName.includes('.')) {
                 const fileData = await zipEntry.async("string");
                 if (fileData && fileData.trim().length > 0) {
@@ -206,12 +215,11 @@ function finishPatientLoading() {
 }
 
 // ============================================================================
-// PROCESAMIENTO Y PARSEO DE DATOS
+// PROCESAMIENTO Y PARSEO DE DATOS (CON ACUMULACIÓN UNIFICADA)
 // ============================================================================
 function parsePatientData(filename, csvString) {
     if (!csvString || !csvString.trim()) return;
 
-    // 1. Detectar automáticamente el separador de columnas
     const delimiter = detectDelimiter(csvString);
     const lines = csvString.trim().split(/\r?\n/);
     let processedData = [];
@@ -258,11 +266,11 @@ function parsePatientData(filename, csvString) {
     });
 
     if (processedData.length > 0) {
-        // Obtenemos el nombre base unificado (ej: "Mejia Karol")
+        // Extraemos el nombre limpio unificado del paciente (ej. "Mejia Karol")
         const patientId = obtenerNombrePaciente(filename);
         const gender = extractGender(patientId);
 
-        // Si el paciente aún no está en el objeto global, lo inicializamos
+        // Si el paciente no existe en el diccionario global, lo creamos
         if (!globalPatients[patientId]) {
             globalPatients[patientId] = {
                 id: patientId,
@@ -278,17 +286,17 @@ function parsePatientData(filename, csvString) {
 
         const patient = globalPatients[patientId];
         
-        // Acumulamos los nuevos datos del archivo a los ya existentes del paciente
+        // Acumulamos los registros de este archivo al total del paciente
         patient.data = patient.data.concat(processedData);
 
-        // Combinamos los conteos de actividad
+        // Combinamos los conteos de actividad de todos sus archivos cargados
         for (const [code, count] of Object.entries(activityCounts)) {
             patient.activityCounts[code] = (patient.activityCounts[code] || 0) + count;
         }
 
         patient.totalRecords += processedData.length;
 
-        // Recalculamos métricas globales del paciente unificado
+        // Recalculamos tiempos y métricas globales
         const startTime = patient.data[0].time;
         const endTime = patient.data[patient.data.length - 1].time;
         patient.totalTime = Math.max(1, Math.round(endTime - startTime));
@@ -304,5 +312,173 @@ function parsePatientData(filename, csvString) {
 
         patient.score = Math.round(score);
         patient.activePercentage = parseFloat(((activeRecords / patient.totalRecords) * 100).toFixed(1));
+    }
+}
+
+// ============================================================================
+// PRESENTACIÓN DE LA INTERFAZ
+// ============================================================================
+function renderPatientList() {
+    const list = document.getElementById('patientList');
+    if (!list) return;
+
+    list.innerHTML = '';
+    const sortedPatients = Object.values(globalPatients).sort((a, b) => b.score - a.score);
+
+    sortedPatients.forEach((patient, index) => {
+        const li = document.createElement('li');
+        let badge = '🥉';
+        if (index === 0) badge = '🥇';
+        else if (index === 1) badge = '🥈';
+
+        li.innerHTML = `<span>${badge} 👤 ${patient.id}</span> <strong style="color: #27ae60;">${patient.score} pts</strong>`;
+        li.onclick = () => {
+            document.querySelectorAll('#patientList li').forEach(el => el.classList.remove('active'));
+            li.classList.add('active');
+            displayPatientData(patient.id, index + 1, sortedPatients.length);
+        };
+        list.appendChild(li);
+    });
+
+    if (sortedPatients.length > 0 && list.children.length > 0) {
+        list.children[0].click();
+    }
+}
+
+function displayPatientData(id, rankPosition, totalPatients) {
+    activePatientId = id;
+    const patient = globalPatients[id];
+    
+    const infoBox = document.getElementById('patientInfo');
+    const chartBox = document.getElementById('chartContainer');
+    if (infoBox) infoBox.classList.remove('hidden');
+    if (chartBox) chartBox.classList.remove('hidden');
+
+    const lblId = document.getElementById('lblId');
+    const lblGender = document.getElementById('lblGender');
+    const lblRecords = document.getElementById('lblRecords');
+    const lblTime = document.getElementById('lblTime');
+
+    if (lblId) lblId.textContent = patient.id;
+    if (lblGender) lblGender.textContent = patient.gender;
+    if (lblRecords) lblRecords.textContent = patient.totalRecords;
+    if (lblTime) lblTime.textContent = formatDuration(patient.totalTime);
+
+    const thead = document.querySelector('#activityTable thead');
+    if (thead) {
+        thead.innerHTML = `
+            <tr>
+                <th>Actividad</th>
+                <th>Tiempo Estimado</th>
+                <th>Porcentaje (%)</th>
+                <th>Puntos Ganados</th>
+            </tr>
+        `;
+    }
+
+    const tbody = document.querySelector('#activityTable tbody');
+    if (tbody) {
+        tbody.innerHTML = '';
+
+        for (const [code, count] of Object.entries(patient.activityCounts)) {
+            const config = activityConfig[code] || { name: `Actividad ${code}`, ptsPerSec: 0.5 };
+            const percent = ((count / patient.totalRecords) * 100).toFixed(1);
+            const timeInSec = Math.round((count / patient.totalRecords) * patient.totalTime);
+            const points = Math.round(count * config.ptsPerSec);
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><strong>${config.name}</strong></td>
+                <td>${formatDuration(timeInSec)}</td>
+                <td><span style="background-color: #e8f8f5; padding: 2px 6px; border-radius: 4px; font-weight: bold;">${percent}%</span></td>
+                <td style="color: #27ae60; font-weight: bold;">+${points} pts</td>
+            `;
+            tbody.appendChild(tr);
+        }
+    }
+
+    renderRewardCard(patient, rankPosition, totalPatients);
+    drawChart(patient.data, 'all');
+}
+
+function renderRewardCard(patient, rankPosition, totalPatients) {
+    let rewardBox = document.getElementById('rewardCard');
+    
+    if (!rewardBox) {
+        rewardBox = document.createElement('div');
+        rewardBox.id = 'rewardCard';
+        rewardBox.style.cssText = "margin-top: 15px; padding: 15px; background: #f8f9fa; border-left: 5px solid #2ecc71; border-radius: 6px;";
+        const infoContainer = document.getElementById('patientInfo');
+        if (infoContainer) infoContainer.appendChild(rewardBox);
+    }
+
+    let medal = '🥉 Bronce (Nivel Iniciador)';
+    if (patient.activePercentage >= 35) medal = '🥇 Oro (Atleta Destacado)';
+    else if (patient.activePercentage >= 15) medal = '🥈 Plata (Activo en Marcha)';
+
+    const rankText = totalPatients > 1 ? `| <strong>Posición:</strong> #${rankPosition} de ${totalPatients}` : '';
+
+    rewardBox.innerHTML = `
+        <h3 style="margin-top: 0; color: #2c3e50;">🏆 Sistema de Recompensas</h3>
+        <p style="margin: 5px 0;"><strong>Puntaje de Actividad:</strong> <span style="font-size: 1.2em; color: #27ae60; font-weight: bold;">${patient.score} Puntos</span> ${rankText}</p>
+        <p style="margin: 5px 0;"><strong>Insignia Obtenida:</strong> ${medal}</p>
+        <p style="margin: 5px 0;"><strong>Tiempo en Movimiento (Deambulando):</strong> ${patient.activePercentage}% del total</p>
+    `;
+}
+
+// ============================================================================
+// GRÁFICO (CHART.JS)
+// ============================================================================
+function drawChart(data, filterCode) {
+    const canvas = document.getElementById('accelerationChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    
+    if (currentChart) {
+        currentChart.destroy();
+    }
+
+    const filteredData = filterCode === 'all' 
+        ? data 
+        : data.filter(d => d.activityCode === filterCode);
+
+    const downsampled = filteredData.filter((_, i) => i % 5 === 0);
+    const labels = downsampled.map(d => d.time.toFixed(2));
+    
+    currentChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                { label: 'Frontal (G)', data: downsampled.map(d => d.accFrontal), borderColor: '#e74c3c', borderWidth: 1, pointRadius: 0 },
+                { label: 'Vertical (G)', data: downsampled.map(d => d.accVertical), borderColor: '#3498db', borderWidth: 1, pointRadius: 0 },
+                { label: 'Lateral (G)', data: downsampled.map(d => d.accLateral), borderColor: '#2ecc71', borderWidth: 1, pointRadius: 0 }
+            ]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: { title: { display: true, text: 'Tiempo (s)' } },
+                y: { title: { display: true, text: 'Aceleración (G)' } }
+            }
+        }
+    });
+}
+
+// ============================================================================
+// MANEJO DE ERRORES Y UI
+// ============================================================================
+function showError(msg) {
+    const errorBox = document.getElementById('errorBox');
+    if (errorBox) {
+        errorBox.textContent = msg;
+        errorBox.classList.remove('hidden');
+    }
+}
+
+function hideError() {
+    const errorBox = document.getElementById('errorBox');
+    if (errorBox) {
+        errorBox.classList.add('hidden');
     }
 }
