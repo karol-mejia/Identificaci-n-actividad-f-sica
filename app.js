@@ -215,7 +215,7 @@ function finishPatientLoading() {
 }
 
 // ============================================================================
-// PROCESAMIENTO Y PARSEO DE DATOS (CON ACUMULACIÓN UNIFICADA)
+// PROCESAMIENTO Y PARSEO DE DATOS (CON ACUMULACIÓN Y FILTRADO SEGURO)
 // ============================================================================
 function parsePatientData(filename, csvString) {
     if (!csvString || !csvString.trim()) return;
@@ -252,10 +252,8 @@ function parsePatientData(filename, csvString) {
             accLateral = accLateral / 9.80665;
         }
 
-        // Intentar leer la actividad desde las columnas internas del archivo (ej. columna 4 u 8)
+        // Lectura segura de la actividad interna evitando negativos y valores erróneos
         let activityCode = defaultActivity;
-        
-        // Verificamos si alguna columna típica contiene un código de actividad válido (ej. 1, 2, 3)
         let rawActivity = NaN;
         if (row[8] !== undefined) {
             rawActivity = parseNum(row[8]);
@@ -263,24 +261,20 @@ function parsePatientData(filename, csvString) {
             rawActivity = parseNum(row[4]);
         }
 
-        // Si encontramos un número de actividad válido y positivo (evitando negativos o contadores extraños)
         if (!isNaN(rawActivity) && rawActivity >= 0 && rawActivity <= 5) {
             activityCode = String(Math.round(rawActivity));
         }
 
-        // Normalizar código 4 a 3 si aplica
         if (activityCode === '4') activityCode = '3';
-        
+
         processedData.push({ time, accFrontal, accVertical, accLateral, activityCode });
         activityCounts[activityCode] = (activityCounts[activityCode] || 0) + 1;
     });
 
     if (processedData.length > 0) {
-        // Extraemos el nombre limpio unificado del paciente (ej. "Mejia Karol")
         const patientId = obtenerNombrePaciente(filename);
         const gender = extractGender(patientId);
 
-        // Si el paciente no existe en el diccionario global, lo creamos
         if (!globalPatients[patientId]) {
             globalPatients[patientId] = {
                 id: patientId,
@@ -296,17 +290,14 @@ function parsePatientData(filename, csvString) {
 
         const patient = globalPatients[patientId];
         
-        // Acumulamos los registros de este archivo al total del paciente
         patient.data = patient.data.concat(processedData);
 
-        // Combinamos los conteos de actividad de todos sus archivos cargados
         for (const [code, count] of Object.entries(activityCounts)) {
             patient.activityCounts[code] = (patient.activityCounts[code] || 0) + count;
         }
 
         patient.totalRecords += processedData.length;
 
-        // Recalculamos tiempos y métricas globales
         const startTime = patient.data[0].time;
         const endTime = patient.data[patient.data.length - 1].time;
         patient.totalTime = Math.max(1, Math.round(endTime - startTime));
@@ -407,8 +398,12 @@ function displayPatientData(id, rankPosition, totalPatients) {
         }
     }
 
-    // ============================================================================
-// SISTEMA DE RECOMPENSAS BASADO EN REGISTROS DE ACELEROMETRÍA
+    renderRewardCard(patient, rankPosition, totalPatients);
+    drawChart(patient.data, 'all');
+}
+
+// ============================================================================
+// SISTEMA DE RECOMPENSAS BASADO EN ACELEROMETRÍA
 // ============================================================================
 function renderRewardCard(patient, rankPosition, totalPatients) {
     let rewardBox = document.getElementById('rewardCard');
@@ -421,7 +416,6 @@ function renderRewardCard(patient, rankPosition, totalPatients) {
         if (infoContainer) infoContainer.appendChild(rewardBox);
     }
 
-    // 1. Asignación de insignia basada estrictamente en los datos de acelerometría (porcentaje de actividad registrada)
     let medal = '🥉 Bronce (Nivel Iniciador)';
     let medalDescription = 'Basado en los registros, el tiempo de deambulación detectado es menor al 15%.';
     
@@ -433,12 +427,10 @@ function renderRewardCard(patient, rankPosition, totalPatients) {
         medalDescription = 'Buen registro de movilidad detectado por los sensores (entre 15% y 35% de deambulación).';
     }
 
-    // 2. Contextualización según el análisis sea individual o grupal
     let rankHtml = '';
     let analyticalMessage = '';
 
     if (totalPatients > 1) {
-        // Modo Comparativo / Grupal
         if (rankPosition <= 3) {
             rankHtml = `<p style="margin: 5px 0;"><strong>Posición en el Ranking:</strong> <span style="color: #e67e22; font-weight: bold;">#${rankPosition} de ${totalPatients}</span> 🏆</p>`;
             analyticalMessage = `<p style="margin: 8px 0 0 0; color: #27ae60; font-style: italic;">📊 Este perfil se encuentra en el podio superior de rendimiento físico según el análisis cruzado de acelerometría.</p>`;
@@ -447,7 +439,6 @@ function renderRewardCard(patient, rankPosition, totalPatients) {
             analyticalMessage = `<p style="margin: 8px 0 0 0; color: #e67e22; font-style: italic;">💡 Este perfil se encuentra fuera de los primeros 3 puestos. Para escalar posiciones en futuras mediciones, se requiere incrementar el tiempo de actividad deambulatoria registrado por el sensor.</p>`;
         }
     } else {
-        // Modo Individual (Un solo paciente analizado)
         analyticalMessage = `<p style="margin: 8px 0 0 0; color: #2980b9; font-style: italic;">📈 Análisis completado. La insignia ha sido otorgada de forma automática al cumplir con los umbrales de actividad física medidos mediante acelerometría.</p>`;
     }
 
@@ -457,31 +448,6 @@ function renderRewardCard(patient, rankPosition, totalPatients) {
         <p style="margin: 5px 0;"><strong>Insignia Asignada:</strong> ${medal} <br><small style="color: #555;">${medalDescription}</small></p>
         <p style="margin: 5px 0;"><strong>Tiempo en Movimiento (Deambulando):</strong> ${patient.activePercentage}% del total registrado</p>
         ${analyticalMessage}
-    `;
-}
-
-function renderRewardCard(patient, rankPosition, totalPatients) {
-    let rewardBox = document.getElementById('rewardCard');
-    
-    if (!rewardBox) {
-        rewardBox = document.createElement('div');
-        rewardBox.id = 'rewardCard';
-        rewardBox.style.cssText = "margin-top: 15px; padding: 15px; background: #f8f9fa; border-left: 5px solid #2ecc71; border-radius: 6px;";
-        const infoContainer = document.getElementById('patientInfo');
-        if (infoContainer) infoContainer.appendChild(rewardBox);
-    }
-
-    let medal = '🥉 Bronce (Nivel Iniciador)';
-    if (patient.activePercentage >= 35) medal = '🥇 Oro (Atleta Destacado)';
-    else if (patient.activePercentage >= 15) medal = '🥈 Plata (Activo en Marcha)';
-
-    const rankText = totalPatients > 1 ? `| <strong>Posición:</strong> #${rankPosition} de ${totalPatients}` : '';
-
-    rewardBox.innerHTML = `
-        <h3 style="margin-top: 0; color: #2c3e50;">🏆 Sistema de Recompensas</h3>
-        <p style="margin: 5px 0;"><strong>Puntaje de Actividad:</strong> <span style="font-size: 1.2em; color: #27ae60; font-weight: bold;">${patient.score} Puntos</span> ${rankText}</p>
-        <p style="margin: 5px 0;"><strong>Insignia Obtenida:</strong> ${medal}</p>
-        <p style="margin: 5px 0;"><strong>Tiempo en Movimiento (Deambulando):</strong> ${patient.activePercentage}% del total</p>
     `;
 }
 
