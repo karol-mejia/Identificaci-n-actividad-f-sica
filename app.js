@@ -407,8 +407,57 @@ function displayPatientData(id, rankPosition, totalPatients) {
         }
     }
 
-    renderRewardCard(patient, rankPosition, totalPatients);
-    drawChart(patient.data, 'all');
+    // ============================================================================
+// SISTEMA DE RECOMPENSAS BASADO EN REGISTROS DE ACELEROMETRÍA
+// ============================================================================
+function renderRewardCard(patient, rankPosition, totalPatients) {
+    let rewardBox = document.getElementById('rewardCard');
+    
+    if (!rewardBox) {
+        rewardBox = document.createElement('div');
+        rewardBox.id = 'rewardCard';
+        rewardBox.style.cssText = "margin-top: 15px; padding: 15px; background: #f8f9fa; border-left: 5px solid #2ecc71; border-radius: 6px;";
+        const infoContainer = document.getElementById('patientInfo');
+        if (infoContainer) infoContainer.appendChild(rewardBox);
+    }
+
+    // 1. Asignación de insignia basada estrictamente en los datos de acelerometría (porcentaje de actividad registrada)
+    let medal = '🥉 Bronce (Nivel Iniciador)';
+    let medalDescription = 'Basado en los registros, el tiempo de deambulación detectado es menor al 15%.';
+    
+    if (patient.activePercentage >= 35) {
+        medal = '🥇 Oro (Atleta Destacado)';
+        medalDescription = '¡Excelente registro! La acelerometría muestra un alto porcentaje de constancia en el movimiento (≥ 35%).';
+    } else if (patient.activePercentage >= 15) {
+        medal = '🥈 Plata (Activo en Marcha)';
+        medalDescription = 'Buen registro de movilidad detectado por los sensores (entre 15% y 35% de deambulación).';
+    }
+
+    // 2. Contextualización según el análisis sea individual o grupal
+    let rankHtml = '';
+    let analyticalMessage = '';
+
+    if (totalPatients > 1) {
+        // Modo Comparativo / Grupal
+        if (rankPosition <= 3) {
+            rankHtml = `<p style="margin: 5px 0;"><strong>Posición en el Ranking:</strong> <span style="color: #e67e22; font-weight: bold;">#${rankPosition} de ${totalPatients}</span> 🏆</p>`;
+            analyticalMessage = `<p style="margin: 8px 0 0 0; color: #27ae60; font-style: italic;">📊 Este perfil se encuentra en el podio superior de rendimiento físico según el análisis cruzado de acelerometría.</p>`;
+        } else {
+            rankHtml = `<p style="margin: 5px 0;"><strong>Posición en el Ranking:</strong> #${rankPosition} de ${totalPatients}</p>`;
+            analyticalMessage = `<p style="margin: 8px 0 0 0; color: #e67e22; font-style: italic;">💡 Este perfil se encuentra fuera de los primeros 3 puestos. Para escalar posiciones en futuras mediciones, se requiere incrementar el tiempo de actividad deambulatoria registrado por el sensor.</p>`;
+        }
+    } else {
+        // Modo Individual (Un solo paciente analizado)
+        analyticalMessage = `<p style="margin: 8px 0 0 0; color: #2980b9; font-style: italic;">📈 Análisis completado. La insignia ha sido otorgada de forma automática al cumplir con los umbrales de actividad física medidos mediante acelerometría.</p>`;
+    }
+
+    rewardBox.innerHTML = `
+        <h3 style="margin-top: 0; color: #2c3e50;">🏆 Evaluación de Actividad por Acelerometría</h3>
+        <p style="margin: 5px 0;"><strong>Puntaje Acumulado:</strong> <span style="font-size: 1.2em; color: #27ae60; font-weight: bold;">${patient.score} Puntos</span> ${rankHtml}</p>
+        <p style="margin: 5px 0;"><strong>Insignia Asignada:</strong> ${medal} <br><small style="color: #555;">${medalDescription}</small></p>
+        <p style="margin: 5px 0;"><strong>Tiempo en Movimiento (Deambulando):</strong> ${patient.activePercentage}% del total registrado</p>
+        ${analyticalMessage}
+    `;
 }
 
 function renderRewardCard(patient, rankPosition, totalPatients) {
