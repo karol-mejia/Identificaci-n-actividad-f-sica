@@ -15,11 +15,6 @@ const activityConfig = {
 // ============================================================================
 // FUNCIONES DE DETECCIÓN INTELIGENTE Y UNIFICACIÓN
 // ============================================================================
-
-/**
- * Limpia y extrae el nombre real del paciente desde el nombre del archivo,
- * eliminando sufijos de actividades (ej. "Mejia Karol_acostada" -> "Mejia Karol").
- */
 function obtenerNombrePaciente(filename) {
     let sinExtension = filename.replace(/\.[^/.]+$/, "").trim();
     let lowerName = sinExtension.toLowerCase();
@@ -43,10 +38,6 @@ function obtenerNombrePaciente(filename) {
     return sinExtension;
 }
 
-/**
- * Detecta automáticamente el delimitador de columnas (;, ,, tabulación o |)
- * analizando la consistencia de las primeras filas del archivo.
- */
 function detectDelimiter(textContent) {
     const lines = textContent.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
     if (lines.length === 0) return ',';
@@ -76,9 +67,6 @@ function detectDelimiter(textContent) {
     return bestDelimiter;
 }
 
-/**
- * Extrae el género del participante a partir del nombre del archivo.
- */
 function extractGender(filename) {
     const clean = filename.toLowerCase();
     if (clean.includes('karol') || clean.includes('maria') || clean.includes('ana') || clean.endsWith('f')) {
@@ -90,19 +78,13 @@ function extractGender(filename) {
     return 'Desconocido';
 }
 
-/**
- * Infiere el código de actividad predeterminado si el archivo no contiene columna de etiqueta.
- */
 function inferActivityFromFilename(filename) {
     const name = filename.toLowerCase();
     if (name.includes('acostad') || name.includes('lying') || name.includes('cama')) return '2';
     if (name.includes('deambula') || name.includes('camin') || name.includes('paso') || name.includes('marcha')) return '3';
-    return '1'; // Sentado por defecto
+    return '1';
 }
 
-/**
- * Convierte segundos a un formato de texto limpio (ej: "35 s" o "2 min 15 s").
- */
 function formatDuration(seconds) {
     const mins = Math.floor(seconds / 60);
     const secs = Math.round(seconds % 60);
@@ -111,7 +93,7 @@ function formatDuration(seconds) {
 }
 
 // ============================================================================
-// INICIALIZACIÓN Y EVENTOS DE CARGA
+// INICIALIZACIÓN Y EVENTOS DE CARGA (SOPORTE MULTI-ARCHIVO)
 // ============================================================================
 document.addEventListener('DOMContentLoaded', () => {
     const fileInput = document.getElementById('fileInput');
@@ -121,10 +103,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!fileInput) return;
 
     fileInput.addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
 
-        if (uploadStatus) uploadStatus.textContent = `Procesando: ${file.name}...`;
+        if (uploadStatus) uploadStatus.textContent = `Procesando archivos...`;
         hideError();
         globalPatients = {}; 
         
@@ -132,12 +114,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (patientList) patientList.innerHTML = '';
 
         try {
-            const fileNameLower = file.name.toLowerCase();
-            if (fileNameLower.endsWith('.zip')) {
-                await processZip(file);
-            } else {
-                await processTextFile(file.name, file);
+            for (const file of files) {
+                const fileNameLower = file.name.toLowerCase();
+                if (fileNameLower.endsWith('.zip')) {
+                    await processZip(file);
+                } else {
+                    await processTextFile(file.name, file);
+                }
             }
+            finishPatientLoading(); // Se ejecuta una sola vez al terminar todos los archivos
         } catch (err) {
             showError(`Error al procesar el archivo: ${err.message}`);
             if (uploadStatus) uploadStatus.textContent = "Error en la carga";
@@ -154,7 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ============================================================================
-// LECTURA DE ARCHIVOS (ZIP, CSV, TXT, TEXT)
+// LECTURA DE ARCHIVOS (ZIP Y TEXTO)
 // ============================================================================
 async function processZip(file) {
     if (typeof JSZip === 'undefined') {
@@ -180,8 +165,6 @@ async function processZip(file) {
             }
         }
     }
-
-    finishPatientLoading();
 }
 
 function processTextFile(filename, file) {
@@ -189,10 +172,9 @@ function processTextFile(filename, file) {
         const reader = new FileReader();
         reader.onload = (e) => {
             parsePatientData(filename, e.target.result);
-            finishPatientLoading();
             resolve();
         };
-        reader.onerror = () => reject(new Error("No se pudo leer el archivo seleccionado."));
+        reader.onerror = () => reject(new Error(`No se pudo leer el archivo: ${filename}`));
         reader.readAsText(file);
     });
 }
@@ -202,7 +184,7 @@ function finishPatientLoading() {
     const statusText = document.getElementById('uploadStatus');
 
     if (loadedCount === 0) {
-        showError("No se pudieron extraer datos válidos del archivo.");
+        showError("No se pudieron extraer datos válidos de los archivos seleccionados.");
         if (statusText) statusText.textContent = "Sin datos válidos";
     } else {
         if (statusText) {
@@ -215,7 +197,7 @@ function finishPatientLoading() {
 }
 
 // ============================================================================
-// PROCESAMIENTO Y PARSEO DE DATOS (CON ACUMULACIÓN Y FILTRADO SEGURO)
+// PROCESAMIENTO Y PARSEO DE DATOS
 // ============================================================================
 function parsePatientData(filename, csvString) {
     if (!csvString || !csvString.trim()) return;
@@ -237,6 +219,8 @@ function parsePatientData(filename, csvString) {
         if (!cleanLine) return;
 
         const row = cleanLine.split(delimiter);
+        
+        // Ignorar cabeceras de texto o filas incompletas de manera segura
         if (row.length < 4) return;
 
         const time = parseNum(row[0]);
@@ -252,7 +236,6 @@ function parsePatientData(filename, csvString) {
             accLateral = accLateral / 9.80665;
         }
 
-        // Lectura segura de la actividad interna evitando negativos y valores erróneos
         let activityCode = defaultActivity;
         let rawActivity = NaN;
         if (row[8] !== undefined) {
@@ -402,9 +385,6 @@ function displayPatientData(id, rankPosition, totalPatients) {
     drawChart(patient.data, 'all');
 }
 
-// ============================================================================
-// SISTEMA DE RECOMPENSAS Y ACLARACIÓN DE INSIGNIA VS RANKING
-// ============================================================================
 function renderRewardCard(patient, rankPosition, totalPatients) {
     let rewardBox = document.getElementById('rewardCard');
     
@@ -451,9 +431,6 @@ function renderRewardCard(patient, rankPosition, totalPatients) {
     `;
 }
 
-// ============================================================================
-// GRÁFICO (CHART.JS)
-// ============================================================================
 function drawChart(data, filterCode) {
     const canvas = document.getElementById('accelerationChart');
     if (!canvas) return;
@@ -490,9 +467,6 @@ function drawChart(data, filterCode) {
     });
 }
 
-// ============================================================================
-// MANEJO DE ERRORES Y UI
-// ============================================================================
 function showError(msg) {
     const errorBox = document.getElementById('errorBox');
     if (errorBox) {
