@@ -300,30 +300,43 @@ function parsePatientData(filename, csvString) {
 }
 
 // ============================================================================
-// PRESENTACIÓN DE LA INTERFAZ
+// PRESENTACIÓN DE LA INTERFAZ (RANKING DINÁMICO)
 // ============================================================================
 function renderPatientList() {
     const list = document.getElementById('patientList');
     if (!list) return;
 
     list.innerHTML = '';
+    // Ordena a los pacientes de mayor a menor puntaje
     const sortedPatients = Object.values(globalPatients).sort((a, b) => b.score - a.score);
 
     sortedPatients.forEach((patient, index) => {
         const li = document.createElement('li');
-        let badge = '🥉';
-        if (index === 0) badge = '🥇';
-        else if (index === 1) badge = '🥈';
+        let badge = '';
+
+        // Definir el indicador según la posición en el ranking
+        if (index === 0) {
+            badge = '🥇'; // 1er Lugar
+        } else if (index === 1) {
+            badge = '🥈'; // 2do Lugar
+        } else if (index === 2) {
+            badge = '🥉'; // 3er Lugar
+        } else {
+            badge = `#${index + 1}`; // Del 4to lugar en adelante muestra su número de puesto exacto
+        }
 
         li.innerHTML = `<span>${badge} 👤 ${patient.id}</span> <strong style="color: #27ae60;">${patient.score} pts</strong>`;
+        
         li.onclick = () => {
             document.querySelectorAll('#patientList li').forEach(el => el.classList.remove('active'));
             li.classList.add('active');
             displayPatientData(patient.id, index + 1, sortedPatients.length);
         };
+        
         list.appendChild(li);
     });
 
+    // Selecciona automáticamente al primer paciente del ranking al cargar
     if (sortedPatients.length > 0 && list.children.length > 0) {
         list.children[0].click();
     }
