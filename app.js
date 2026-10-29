@@ -252,8 +252,24 @@ function parsePatientData(filename, csvString) {
             accLateral = accLateral / 9.80665;
         }
 
-        // Usar directamente la actividad inferida del nombre del archivo (ej. acostada, marcha, etc.)
+        // Intentar leer la actividad desde las columnas internas del archivo (ej. columna 4 u 8)
         let activityCode = defaultActivity;
+        
+        // Verificamos si alguna columna típica contiene un código de actividad válido (ej. 1, 2, 3)
+        let rawActivity = NaN;
+        if (row[8] !== undefined) {
+            rawActivity = parseNum(row[8]);
+        } else if (row[4] !== undefined) {
+            rawActivity = parseNum(row[4]);
+        }
+
+        // Si encontramos un número de actividad válido y positivo (evitando negativos o contadores extraños)
+        if (!isNaN(rawActivity) && rawActivity >= 0 && rawActivity <= 5) {
+            activityCode = String(Math.round(rawActivity));
+        }
+
+        // Normalizar código 4 a 3 si aplica
+        if (activityCode === '4') activityCode = '3';
         
         processedData.push({ time, accFrontal, accVertical, accLateral, activityCode });
         activityCounts[activityCode] = (activityCounts[activityCode] || 0) + 1;
