@@ -169,12 +169,40 @@ fileInput.addEventListener('change', async (e) => {
     }
 });
 
-// ============================================================================
-// LECTURA Y ENVÍO DE ARCHIVOS AL BACKEND
-// ============================================================================
+// ==========================================================
+// LECTURA DE ARCHIVOS (ZIP Y TEXTO)
+// ==========================================================
+
+async function processZip(file) {
+    if (typeof JSZip === 'undefined') {
+        throw new Error("La librería JSZip no está cargada en el proyecto.");
+    }
+    const zip = new JSZip();
+    const contents = await zip.loadAsync(file);
+    
+    for (const [relativePath, zipEntry] of Object.entries(contents.files)) {
+        if (zipEntry.dir || relativePath.includes('MACOSX') || relativePath.startsWith('.')) {
+            continue;
+        }
+        const filename = relativePath.split('/').pop();
+        if (filename && !filename.startsWith('.')) {
+            const lowerName = filename.toLowerCase();
+            if (lowerName.endsWith('.csv') || lowerName.endsWith('.txt') || lowerName.endsWith('.text') || !lowerName.includes('.')) {
+                const fileDataString = await zipEntry.async("string");
+                if (fileDataString && fileDataString.trim().length > 0) {
+                    // Convertimos el contenido del ZIP en un archivo virtual para enviarlo al backend
+                    const blob = new Blob([fileDataString], { type: 'text/plain' });
+                    const extractedFile = new File([blob], filename, { type: 'text/plain' });
+                    await processTextFile(extractedFile);
+                }
+            }
+        }
+    }
+}
+
 async function processTextFile(file) {
     const formData = new FormData();
-    formData.append('file', file); // 'file' es el archivo .csv o .txt seleccionado
+    formData.append('file', file); // Archivo .csv o .txt seleccionado
 
     try {
         const response = await fetch('https://backend-acelerometria.onrender.com/analizar', {
@@ -187,27 +215,20 @@ async function processTextFile(file) {
         }
 
         const data = await response.json();
+        
+        // Guardamos el paciente procesado por el backend en tu estructura global
+        if (data && data.id) {
+            globalPatients[data.id] = data;
+        }
+        
         console.log("¡Resultado recibido con éxito del backend!", data);
-
-        // ⚠️ ADAPTACIÓN DE DATOS:
-        // Dependiendo de lo que te devuelva tu backend en 'data', puedes integrarlo 
-        // a tu estructura globalPatients o mostrarlo en pantalla.
-        // 
-        // OPCIÓN A: Si tu backend devuelve texto plano o CSV procesado:
-        // parsePatientData(file.name, data.contenidoCsv);
-        //
-        // OPCIÓN B: Si tu backend ya procesó todo y te devuelve un objeto de paciente:
-        // if (data.id && data.data) {
-        //     globalPatients[data.id] = data;
-        // }
-
         return data;
 
     } catch (error) {
         console.error('Hubo un error al conectar con el backend:', error);
         throw error;
     }
-}
+// 
 
 function finishPatientLoading() {
     const loadedCount = Object.keys(globalPatients).length;
