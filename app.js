@@ -119,7 +119,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (fileNameLower.endsWith('.zip')) {
                     await processZip(file);
                 } else {
-                    await processTextFile(file.name, file);
+                    // AHORA (solo recibe el objeto file):
+                    await processTextFile(file);
                 }
             }
             finishPatientLoading(); // Se ejecuta una sola vez al terminar todos los archivos
