@@ -138,45 +138,74 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// ============================================================================
-// LECTURA DE ARCHIVOS (ZIP Y TEXTO)
-// ============================================================================
-async function processZip(file) {
-    if (typeof JSZip === 'undefined') {
-        throw new Error("La librería JSZip no está cargada en el proyecto.");
-    }
+fileInput.addEventListener('change', async (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
 
-    const zip = new JSZip();
-    const contents = await zip.loadAsync(file);
+    if (uploadStatus) uploadStatus.textContent = `Procesando archivos con el servidor...`;
+    hideError();
+    globalPatients = {}; 
+    
+    const patientList = document.getElementById('patientList');
+    if (patientList) patientList.innerHTML = '';
 
-    for (const [relativePath, zipEntry] of Object.entries(contents.files)) {
-        if (zipEntry.dir || relativePath.includes('__MACOSX') || relativePath.startsWith('.')) {
-            continue;
-        }
-
-        const filename = relativePath.split('/').pop();
-        if (filename && !filename.startsWith('.')) {
-            const lowerName = filename.toLowerCase();
-            if (lowerName.endsWith('.csv') || lowerName.endsWith('.txt') || lowerName.endsWith('.text') || !lowerName.includes('.')) {
-                const fileData = await zipEntry.async("string");
-                if (fileData && fileData.trim().length > 0) {
-                    parsePatientData(filename, fileData);
-                }
+    try {
+        for (const file of files) {
+            const fileNameLower = file.name.toLowerCase();
+            if (fileNameLower.endsWith('.zip')) {
+                // Si manejas ZIPs, puedes descomprimirlos localmente 
+                // o enviar cada archivo interno al backend según tu lógica.
+                await processZip(file);
+            } else {
+                // Aquí se ejecuta tu petición fetch para cada CSV/TXT
+                await processTextFile(file);
             }
         }
+        finishPatientLoading(); // Renderiza la lista y el ranking cuando terminen todas las peticiones
+    } catch (err) {
+        showError(`Error al procesar el archivo: ${err.message}`);
+        if (uploadStatus) uploadStatus.textContent = "Error en la carga";
     }
-}
+});
 
-function processTextFile(filename, file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            parsePatientData(filename, e.target.result);
-            resolve();
-        };
-        reader.onerror = () => reject(new Error(`No se pudo leer el archivo: ${filename}`));
-        reader.readAsText(file);
-    });
+// ============================================================================
+// LECTURA Y ENVÍO DE ARCHIVOS AL BACKEND
+// ============================================================================
+async function processTextFile(file) {
+    const formData = new FormData();
+    formData.append('file', file); // 'file' es el archivo .csv o .txt seleccionado
+
+    try {
+        const response = await fetch('https://backend-acelerometria.onrender.com/analizar', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) {
+            throw new Error(`Error HTTP: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log("¡Resultado recibido con éxito del backend!", data);
+
+        // ⚠️ ADAPTACIÓN DE DATOS:
+        // Dependiendo de lo que te devuelva tu backend en 'data', puedes integrarlo 
+        // a tu estructura globalPatients o mostrarlo en pantalla.
+        // 
+        // OPCIÓN A: Si tu backend devuelve texto plano o CSV procesado:
+        // parsePatientData(file.name, data.contenidoCsv);
+        //
+        // OPCIÓN B: Si tu backend ya procesó todo y te devuelve un objeto de paciente:
+        // if (data.id && data.data) {
+        //     globalPatients[data.id] = data;
+        // }
+
+        return data;
+
+    } catch (error) {
+        console.error('Hubo un error al conectar con el backend:', error);
+        throw error;
+    }
 }
 
 function finishPatientLoading() {
