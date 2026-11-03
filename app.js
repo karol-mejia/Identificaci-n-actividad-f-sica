@@ -31,7 +31,6 @@ async function processZip(file) {
         const filename = relativePath.split('/').pop();
         if (filename && !filename.startsWith('.') && !filename.toLowerCase().includes('readme')) {
             const lowerName = filename.toLowerCase();
-            // CORREGIDO: Paréntesis cerrado correctamente en .txt)
             if (lowerName.endsWith('.csv') || lowerName.endsWith('.txt') || !lowerName.includes('.')) {
                 try {
                     const text = await zipEntry.async("string");
@@ -61,7 +60,21 @@ async function processTextFile(file) {
         const data = await response.json();
         
         if (data && data.id) {
-            globalPatients[data.id] = data;
+            // Unificar inteligentemente sumando puntajes, registros y acumulando actividades en la tabla
+            if (globalPatients[data.id]) {
+                globalPatients[data.id].totalRecords += data.totalRecords;
+                globalPatients[data.id].score += data.score;
+                globalPatients[data.id].data = globalPatients[data.id].data.concat(data.data);
+                if (data.activityBreakdown) {
+                    globalPatients[data.id].activityBreakdown = globalPatients[data.id].activityBreakdown.concat(data.activityBreakdown);
+                }
+                // Recalcular porcentaje activo global
+                const currentActive = parseFloat(globalPatients[data.id].activePercentage) || 0;
+                const newActive = parseFloat(data.activePercentage) || 0;
+                globalPatients[data.id].activePercentage = ((currentActive + newActive) / 2).toFixed(1);
+            } else {
+                globalPatients[data.id] = data;
+            }
         }
     } catch (err) {
         console.warn('Archivo omitido:', err);
