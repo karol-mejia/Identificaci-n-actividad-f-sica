@@ -5,6 +5,17 @@ let globalPatients = {};
 let currentChart = null;
 let activePatientId = null;
 
+document.addEventListener('DOMContentLoaded', () => {
+    const customBtn = document.getElementById('customBtn');
+    const fileInput = document.getElementById('fileInput');
+
+    if (customBtn && fileInput) {
+        customBtn.addEventListener('click', () => {
+            fileInput.click(); // Abre la ventana de archivos al hacer clic en el botón azul
+        });
+    }
+});
+
 // Configuración de actividades y puntos por segundo
 const activityConfig = {
     '1': { name: 'Sentado en una silla', ptsPerSec: 0.5, color: '#f39c12' },
