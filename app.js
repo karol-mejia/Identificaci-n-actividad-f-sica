@@ -10,7 +10,7 @@ function showError(message) {
         errorDiv = document.createElement('div');
         errorDiv.id = 'errorBanner';
         errorDiv.style.cssText = 'background: #fee2e2; color: #b91c1c; padding: 12px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #fecaca; font-size: 14px;';
-        container.appendChild(errorDiv); // Uso exclusivo de appendChild para evitar fallos de nodos
+        container.appendChild(errorDiv);
     }
     errorDiv.textContent = message;
     errorDiv.style.display = 'block';
@@ -31,7 +31,8 @@ async function processZip(file) {
         const filename = relativePath.split('/').pop();
         if (filename && !filename.startsWith('.') && !filename.toLowerCase().includes('readme')) {
             const lowerName = filename.toLowerCase();
-            if (lowerName.endsWith('.csv') || lowerName.endsWith('.txt'] || !lowerName.includes('.')) {
+            // CORREGIDO: Paréntesis cerrado correctamente en .txt)
+            if (lowerName.endsWith('.csv') || lowerName.endsWith('.txt') || !lowerName.includes('.')) {
                 try {
                     const text = await zipEntry.async("string");
                     if (text.trim().length > 0) {
