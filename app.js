@@ -1,189 +1,36 @@
-// ============================================================================
-// CONFIGURACIÓN GLOBAL Y ESTADOS
-// ============================================================================
+// ==========================================================
+// VARIABLES GLOBALES DE LA APLICACIÓN
+// ==========================================================
 let globalPatients = {};
-let currentChart = null;
 let activePatientId = null;
-
-document.addEventListener('DOMContentLoaded', () => {
-    const customBtn = document.getElementById('customBtn');
-    const fileInput = document.getElementById('fileInput');
-
-    if (customBtn && fileInput) {
-        customBtn.addEventListener('click', () => {
-            fileInput.click(); // Abre la ventana de archivos al hacer clic en el botón azul
-        });
-    }
-});
-
-// Configuración de actividades y puntos por segundo
-const activityConfig = {
-    '1': { name: 'Sentado en una silla', ptsPerSec: 0.5, color: '#f39c12' },
-    '2': { name: 'Acostado', ptsPerSec: 0.0, color: '#95a5a6' },
-    '3': { name: 'Deambulando (Caminar)', ptsPerSec: 2.0, color: '#2ecc71' }
-};
-
-// ============================================================================
-// FUNCIONES DE DETECCIÓN INTELIGENTE Y UNIFICACIÓN
-// ============================================================================
-function obtenerNombrePaciente(filename) {
-    let sinExtension = filename.replace(/\.[^/.]+$/, "").trim();
-    let lowerName = sinExtension.toLowerCase();
-    
-    const actividadesConocidas = ['sentada', 'acostada', 'marcha', 'bipeda', 'reposo', 'caminando', 'caminar', 'deambulando'];
-    
-    for (let act of actividadesConocidas) {
-        if (lowerName.includes(act)) {
-            let index = lowerName.indexOf(act);
-            let nombreLimpio = sinExtension.substring(0, index).trim();
-            return nombreLimpio.replace(/[_–-]+$/, "").trim();
-        }
-    }
-    
-    let separadores = /[_–-]/;
-    if (separadores.test(sinExtension)) {
-        let partes = sinExtension.split(separadores);
-        return partes[0].trim();
-    }
-    
-    return sinExtension;
-}
-
-function detectDelimiter(textContent) {
-    const lines = textContent.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
-    if (lines.length === 0) return ',';
-
-    const sampleLines = lines.slice(0, 10);
-    const candidates = [';', '\t', '|', ','];
-    
-    let bestDelimiter = ',';
-    let maxScore = -Infinity;
-
-    candidates.forEach(cand => {
-        const counts = sampleLines.map(line => (line.split(cand).length - 1));
-        const total = counts.reduce((acc, val) => acc + val, 0);
-
-        if (total > 0) {
-            const avg = total / counts.length;
-            const variance = counts.reduce((acc, val) => acc + Math.pow(val - avg, 2), 0) / counts.length;
-            const score = avg - (variance * 1.5);
-            
-            if (score > maxScore) {
-                maxScore = score;
-                bestDelimiter = cand;
-            }
-        }
-    });
-
-    return bestDelimiter;
-}
-
-function extractGender(filename) {
-    const clean = filename.toLowerCase();
-    if (clean.includes('karol') || clean.includes('maria') || clean.includes('ana') || clean.endsWith('f')) {
-        return 'Femenino';
-    }
-    if (clean.includes('juan') || clean.includes('carlos') || clean.includes('pedro') || clean.endsWith('m')) {
-        return 'Masculino';
-    }
-    return 'Desconocido';
-}
-
-function inferActivityFromFilename(filename) {
-    const name = filename.toLowerCase();
-    if (name.includes('acostad') || name.includes('lying') || name.includes('cama')) return '2';
-    if (name.includes('deambula') || name.includes('camin') || name.includes('paso') || name.includes('marcha')) return '3';
-    return '1';
-}
-
-function formatDuration(seconds) {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.round(seconds % 60);
-    if (mins === 0) return `${secs} s`;
-    return `${mins} min ${secs} s`;
-}
-
-// ============================================================================
-// INICIALIZACIÓN Y EVENTOS DE CARGA (SOPORTE MULTI-ARCHIVO)
-// ============================================================================
-document.addEventListener('DOMContentLoaded', () => {
-    const fileInput = document.getElementById('fileInput');
-    const uploadStatus = document.getElementById('uploadStatus');
-    const activityFilter = document.getElementById('activityFilter');
-
-    if (!fileInput) return;
-
-    fileInput.addEventListener('change', async (e) => {
-        const files = Array.from(e.target.files);
-        if (files.length === 0) return;
-
-        if (uploadStatus) uploadStatus.textContent = `Procesando archivos...`;
-        hideError();
-        globalPatients = {}; 
-        
-        const patientList = document.getElementById('patientList');
-        if (patientList) patientList.innerHTML = '';
-
-        try {
-            for (const file of files) {
-                const fileNameLower = file.name.toLowerCase();
-                if (fileNameLower.endsWith('.zip')) {
-                    await processZip(file);
-                } else {
-                    // AHORA (solo recibe el objeto file):
-                    await processTextFile(file);
-                }
-            }
-            finishPatientLoading(); // Se ejecuta una sola vez al terminar todos los archivos
-        } catch (err) {
-            showError(`Error al procesar el archivo: ${err.message}`);
-            if (uploadStatus) uploadStatus.textContent = "Error en la carga";
-        }
-    });
-
-    if (activityFilter) {
-        activityFilter.addEventListener('change', (e) => {
-            if (activePatientId && globalPatients[activePatientId]) {
-                drawChart(globalPatients[activePatientId].data, e.target.value);
-            }
-        });
-    }
-});
-
-fileInput.addEventListener('change', async (e) => {
-    const files = Array.from(e.target.files);
-    if (files.length === 0) return;
-
-    if (uploadStatus) uploadStatus.textContent = `Procesando archivos con el servidor...`;
-    hideError();
-    globalPatients = {}; 
-    
-    const patientList = document.getElementById('patientList');
-    if (patientList) patientList.innerHTML = '';
-
-    try {
-        for (const file of files) {
-            const fileNameLower = file.name.toLowerCase();
-            if (fileNameLower.endsWith('.zip')) {
-                // Si manejas ZIPs, puedes descomprimirlos localmente 
-                // o enviar cada archivo interno al backend según tu lógica.
-                await processZip(file);
-            } else {
-                // Aquí se ejecuta tu petición fetch para cada CSV/TXT
-                await processTextFile(file);
-            }
-        }
-        finishPatientLoading(); // Renderiza la lista y el ranking cuando terminen todas las peticiones
-    } catch (err) {
-        showError(`Error al procesar el archivo: ${err.message}`);
-        if (uploadStatus) uploadStatus.textContent = "Error en la carga";
-    }
-});
+let chartInstance = null;
 
 // ==========================================================
-// LECTURA DE ARCHIVOS (ZIP Y TEXTO)
+// GESTIÓN DE ERRORES EN INTERFAZ
 // ==========================================================
+function showError(message) {
+    let errorDiv = document.getElementById('errorBanner');
+    if (!errorDiv) {
+        errorDiv = document.createElement('div');
+        errorDiv.id = 'errorBanner';
+        errorDiv.style.cssText = 'background: #fee2e2; color: #b91c1c; padding: 12px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #fecaca; font-size: 14px;';
+        const container = document.querySelector('.main-container');
+        if (container) container.insertBefore(errorDiv, container.firstChild);
+    }
+    errorDiv.textContent = message;
+    errorDiv.style.display = 'block';
+}
 
+function hideError() {
+    const errorDiv = document.getElementById('errorBanner');
+    if (errorDiv) {
+        errorDiv.style.display = 'none';
+    }
+}
+
+// ==========================================================
+// LECTURA DE ARCHIVOS COMPRIMIDOS (ZIP)
+// ==========================================================
 async function processZip(file) {
     if (typeof JSZip === 'undefined') {
         throw new Error("La librería JSZip no está cargada en el proyecto.");
@@ -201,7 +48,6 @@ async function processZip(file) {
             if (lowerName.endsWith('.csv') || lowerName.endsWith('.txt') || lowerName.endsWith('.text') || !lowerName.includes('.')) {
                 const fileDataString = await zipEntry.async("string");
                 if (fileDataString && fileDataString.trim().length > 0) {
-                    // Convertimos el contenido del ZIP en un archivo virtual para enviarlo al backend
                     const blob = new Blob([fileDataString], { type: 'text/plain' });
                     const extractedFile = new File([blob], filename, { type: 'text/plain' });
                     await processTextFile(extractedFile);
@@ -211,6 +57,9 @@ async function processZip(file) {
     }
 }
 
+// ==========================================================
+// ENVÍO DE ARCHIVOS AL BACKEND (RENDER)
+// ==========================================================
 async function processTextFile(file) {
     const formData = new FormData();
     formData.append('file', file); // Archivo .csv o .txt seleccionado
@@ -222,12 +71,12 @@ async function processTextFile(file) {
         });
 
         if (!response.ok) {
-            throw new Error(`Error HTTP: ${response.status}`);
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.error || `Error HTTP: ${response.status}`);
         }
 
         const data = await response.json();
         
-        // Guardamos el paciente procesado por el backend en tu estructura global
         if (data && data.id) {
             globalPatients[data.id] = data;
         }
@@ -239,320 +88,160 @@ async function processTextFile(file) {
         console.error('Hubo un error al conectar con el backend:', error);
         throw error;
     }
-// 
+}
 
+// ==========================================================
+// RENDERIZADO DE PACIENTES Y RANKING (GAMIFICACIÓN)
+// ==========================================================
 function finishPatientLoading() {
-    const loadedCount = Object.keys(globalPatients).length;
-    const statusText = document.getElementById('uploadStatus');
-
-    if (loadedCount === 0) {
-        showError("No se pudieron extraer datos válidos de los archivos seleccionados.");
-        if (statusText) statusText.textContent = "Sin datos válidos";
-    } else {
-        if (statusText) {
-            statusText.textContent = loadedCount === 1 
-                ? "1 paciente cargado exitosamente." 
-                : `${loadedCount} pacientes cargados exitosamente.`;
-        }
-        renderPatientList();
-    }
-}
-
-// ============================================================================
-// PROCESAMIENTO Y PARSEO DE DATOS
-// ============================================================================
-function parsePatientData(filename, csvString) {
-    if (!csvString || !csvString.trim()) return;
-
-    const delimiter = detectDelimiter(csvString);
-    const lines = csvString.trim().split(/\r?\n/);
-    let processedData = [];
-    let activityCounts = {};
-
-    const defaultActivity = inferActivityFromFilename(filename);
-
-    const parseNum = (val) => {
-        if (val === undefined || val === null) return NaN;
-        return parseFloat(String(val).replace(',', '.').trim());
-    };
-
-    lines.forEach((line) => {
-        const cleanLine = line.trim();
-        if (!cleanLine) return;
-
-        const row = cleanLine.split(delimiter);
-        
-        // Ignorar cabeceras de texto o filas incompletas de manera segura
-        if (row.length < 4) return;
-
-        const time = parseNum(row[0]);
-        let accFrontal = parseNum(row[1]);
-        let accVertical = parseNum(row[2]);
-        let accLateral = parseNum(row[3]);
-
-        if (isNaN(time) || isNaN(accFrontal) || isNaN(accVertical) || isNaN(accLateral)) return;
-
-        if (Math.abs(accVertical) > 3.0 || Math.abs(accFrontal) > 3.0 || Math.abs(accLateral) > 3.0) {
-            accFrontal = accFrontal / 9.80665;
-            accVertical = accVertical / 9.80665;
-            accLateral = accLateral / 9.80665;
-        }
-
-        let activityCode = defaultActivity;
-        let rawActivity = NaN;
-        if (row[8] !== undefined) {
-            rawActivity = parseNum(row[8]);
-        } else if (row[4] !== undefined) {
-            rawActivity = parseNum(row[4]);
-        }
-
-        if (!isNaN(rawActivity) && rawActivity >= 0 && rawActivity <= 5) {
-            activityCode = String(Math.round(rawActivity));
-        }
-
-        if (activityCode === '4') activityCode = '3';
-
-        processedData.push({ time, accFrontal, accVertical, accLateral, activityCode });
-        activityCounts[activityCode] = (activityCounts[activityCode] || 0) + 1;
-    });
-
-    if (processedData.length > 0) {
-        const patientId = obtenerNombrePaciente(filename);
-        const gender = extractGender(patientId);
-
-        if (!globalPatients[patientId]) {
-            globalPatients[patientId] = {
-                id: patientId,
-                gender: gender,
-                data: [],
-                activityCounts: {},
-                totalRecords: 0,
-                totalTime: 0,
-                score: 0,
-                activePercentage: 0
-            };
-        }
-
-        const patient = globalPatients[patientId];
-        
-        patient.data = patient.data.concat(processedData);
-
-        for (const [code, count] of Object.entries(activityCounts)) {
-            patient.activityCounts[code] = (patient.activityCounts[code] || 0) + count;
-        }
-
-        patient.totalRecords += processedData.length;
-
-        const startTime = patient.data[0].time;
-        const endTime = patient.data[patient.data.length - 1].time;
-        patient.totalTime = Math.max(1, Math.round(endTime - startTime));
-
-        let score = 0;
-        let activeRecords = 0;
-
-        for (const [code, count] of Object.entries(patient.activityCounts)) {
-            const config = activityConfig[code] || { ptsPerSec: 0.5 };
-            score += count * config.ptsPerSec;
-            if (code === '3') activeRecords += count;
-        }
-
-        patient.score = Math.round(score);
-        patient.activePercentage = parseFloat(((activeRecords / patient.totalRecords) * 100).toFixed(1));
-    }
-}
-
-// ============================================================================
-// PRESENTACIÓN DE LA INTERFAZ (RANKING DINÁMICO)
-// ============================================================================
-function renderPatientList() {
-    const list = document.getElementById('patientList');
-    if (!list) return;
-
-    list.innerHTML = '';
-    // Ordena a los pacientes de mayor a menor puntaje
-    const sortedPatients = Object.values(globalPatients).sort((a, b) => b.score - a.score);
-
-    sortedPatients.forEach((patient, index) => {
-        const li = document.createElement('li');
-        let badge = '';
-
-        // Definir el indicador según la posición en el ranking
-        if (index === 0) {
-            badge = '🥇'; // 1er Lugar
-        } else if (index === 1) {
-            badge = '🥈'; // 2do Lugar
-        } else if (index === 2) {
-            badge = '🥉'; // 3er Lugar
-        } else {
-            badge = `#${index + 1}`; // Del 4to lugar en adelante muestra su número de puesto exacto
-        }
-
-        li.innerHTML = `<span>${badge} 👤 ${patient.id}</span> <strong style="color: #27ae60;">${patient.score} pts</strong>`;
-        
-        li.onclick = () => {
-            document.querySelectorAll('#patientList li').forEach(el => el.classList.remove('active'));
-            li.classList.add('active');
-            displayPatientData(patient.id, index + 1, sortedPatients.length);
-        };
-        
-        list.appendChild(li);
-    });
-
-    // Selecciona automáticamente al primer paciente del ranking al cargar
-    if (sortedPatients.length > 0 && list.children.length > 0) {
-        list.children[0].click();
-    }
-}
-
-function displayPatientData(id, rankPosition, totalPatients) {
-    activePatientId = id;
-    const patient = globalPatients[id];
+    const patientList = document.getElementById('patientList');
+    if (!patientList) return;
     
-    const infoBox = document.getElementById('patientInfo');
-    const chartBox = document.getElementById('chartContainer');
-    if (infoBox) infoBox.classList.remove('hidden');
-    if (chartBox) chartBox.classList.remove('hidden');
+    patientList.innerHTML = '';
+    const patientIds = Object.keys(globalPatients);
+    
+    if (patientIds.length === 0) {
+        patientList.innerHTML = '<p style="color: #6b7280; font-style: italic;">No hay pacientes cargados</p>';
+        return;
+    }
 
-    const lblId = document.getElementById('lblId');
-    const lblGender = document.getElementById('lblGender');
-    const lblRecords = document.getElementById('lblRecords');
-    const lblTime = document.getElementById('lblTime');
+    // Ordenar pacientes por puntaje de mayor a menor (Podio)
+    patientIds.sort((a, b) => globalPatients[b].score - globalPatients[a].score);
 
-    if (lblId) lblId.textContent = patient.id;
-    if (lblGender) lblGender.textContent = patient.gender;
-    if (lblRecords) lblRecords.textContent = patient.totalRecords;
-    if (lblTime) lblTime.textContent = formatDuration(patient.totalTime);
+    patientIds.forEach((id, index) => {
+        const patient = globalPatients[id];
+        const item = document.createElement('div');
+        item.style.cssText = 'padding: 12px; margin-bottom: 10px; border-radius: 8px; background: white; border: 1px solid #e5e7eb; cursor: pointer; transition: all 0.2s;';
+        
+        let rankBadge = '';
+        if (index === 0) rankBadge = '🥇 1er Lugar';
+        else if (index === 1) rankBadge = '🥈 2do Lugar';
+        else if (index === 2) rankBadge = '🥉 3er Lugar';
+        else rankBadge = `#${index + 1}`;
 
-    const thead = document.querySelector('#activityTable thead');
-    if (thead) {
-        thead.innerHTML = `
-            <tr>
-                <th>Actividad</th>
-                <th>Tiempo Estimado</th>
-                <th>Porcentaje (%)</th>
-                <th>Puntos Ganados</th>
-            </tr>
+        item.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <strong>${patient.id}</strong>
+                <span style="font-size: 11px; background: #e0f2fe; color: #0369a1; padding: 3px 8px; border-radius: 4px; font-weight: bold;">${rankBadge}</span>
+            </div>
+            <div style="font-size: 13px; color: #4b5563; margin-top: 6px;">
+                Puntaje: <b>${patient.score} pts</b> | Activo: <b>${patient.activePercentage}%</b>
+            </div>
         `;
+
+        item.addEventListener('click', () => {
+            document.querySelectorAll('#patientList > div').forEach(el => el.style.borderColor = '#e5e7eb');
+            item.style.borderColor = '#3b82f6';
+            activePatientId = id;
+            
+            const filterSelect = document.getElementById('activityFilter');
+            const filterVal = filterSelect ? filterSelect.value : 'all';
+            drawChart(patient.data, filterVal);
+        });
+
+        patientList.appendChild(item);
+    });
+
+    // Seleccionar automáticamente al primer paciente del ranking al terminar
+    if (patientIds.length > 0) {
+        activePatientId = patientIds[0];
+        const firstItem = patientList.firstChild;
+        if (firstItem) firstItem.style.borderColor = '#3b82f6';
+        drawChart(globalPatients[activePatientId].data, 'all');
     }
-
-    const tbody = document.querySelector('#activityTable tbody');
-    if (tbody) {
-        tbody.innerHTML = '';
-
-        for (const [code, count] of Object.entries(patient.activityCounts)) {
-            const config = activityConfig[code] || { name: `Actividad ${code}`, ptsPerSec: 0.5 };
-            const percent = ((count / patient.totalRecords) * 100).toFixed(1);
-            const timeInSec = Math.round((count / patient.totalRecords) * patient.totalTime);
-            const points = Math.round(count * config.ptsPerSec);
-
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td><strong>${config.name}</strong></td>
-                <td>${formatDuration(timeInSec)}</td>
-                <td><span style="background-color: #e8f8f5; padding: 2px 6px; border-radius: 4px; font-weight: bold;">${percent}%</span></td>
-                <td style="color: #27ae60; font-weight: bold;">+${points} pts</td>
-            `;
-            tbody.appendChild(tr);
-        }
-    }
-
-    renderRewardCard(patient, rankPosition, totalPatients);
-    drawChart(patient.data, 'all');
 }
 
-function renderRewardCard(patient, rankPosition, totalPatients) {
-    let rewardBox = document.getElementById('rewardCard');
-    
-    if (!rewardBox) {
-        rewardBox = document.createElement('div');
-        rewardBox.id = 'rewardCard';
-        rewardBox.style.cssText = "margin-top: 15px; padding: 15px; background: #f8f9fa; border-left: 5px solid #2ecc71; border-radius: 6px;";
-        const infoContainer = document.getElementById('patientInfo');
-        if (infoContainer) infoContainer.appendChild(rewardBox);
+// ==========================================================
+// VISUALIZACIÓN DE GRÁFICAS CON CHART.JS
+// ==========================================================
+function drawChart(records, activityFilter) {
+    const ctx = document.getElementById('activityChart');
+    if (!ctx) return;
+
+    let filteredRecords = records;
+    if (activityFilter && activityFilter !== 'all') {
+        filteredRecords = records.filter(r => String(r.activityCode) === String(activityFilter));
     }
 
-    let medal = '🥉 Bronce (Nivel Iniciador)';
-    let medalDescription = 'Basado en los registros, el tiempo de deambulación detectado es menor al 15%.';
-    
-    if (patient.activePercentage >= 35) {
-        medal = '🥇 Oro (Atleta Destacado)';
-        medalDescription = '¡Excelente registro! La acelerometría muestra un alto porcentaje de constancia en el movimiento (≥ 35%).';
-    } else if (patient.activePercentage >= 15) {
-        medal = '🥈 Plata (Activo en Marcha)';
-        medalDescription = 'Buen registro de movilidad detectado por los sensores (entre 15% y 35% de deambulación).';
+    // Muestreo optimizado para que la gráfica cargue de forma fluida
+    const step = Math.max(1, Math.floor(filteredRecords.length / 600));
+    const sampled = filteredRecords.filter((_, i) => i % step === 0);
+
+    const labels = sampled.map(r => r.time);
+    const frontal = sampled.map(r => r.accFrontal);
+    const vertical = sampled.map(r => r.accVertical);
+    const lateral = sampled.map(r => r.accLateral);
+
+    if (chartInstance) {
+        chartInstance.destroy();
     }
 
-    let rankHtml = '';
-    let analyticalMessage = '';
-
-    if (totalPatients > 1) {
-        if (rankPosition <= 3) {
-            rankHtml = `<p style="margin: 5px 0;"><strong>Posición en el Ranking General:</strong> <span style="color: #e67e22; font-weight: bold;">#${rankPosition} de ${totalPatients} (Podio 🏆)</span></p>`;
-            analyticalMessage = `<p style="margin: 8px 0 0 0; color: #27ae60; font-style: italic;">📊 Nota: La <strong>posición en el ranking</strong> indica tu lugar general por puntaje acumulado, mientras que la <strong>insignia de Plata</strong> refleja tu nivel específico de movilidad medido por acelerometría.</p>`;
-        } else {
-            rankHtml = `<p style="margin: 5px 0;"><strong>Posición en el Ranking General:</strong> #${rankPosition} de ${totalPatients}</p>`;
-            analyticalMessage = `<p style="margin: 8px 0 0 0; color: #27ae60; font-style: italic;">💡 Este perfil se encuentra fuera de los primeros 3 puestos del ranking. Incrementa el tiempo de actividad para subir posiciones.</p>`;
-        }
-    } else {
-        analyticalMessage = `<p style="margin: 8px 0 0 0; color: #2980b9; font-style: italic;">📈 Análisis individual completado. Tu insignia se otorga por los umbrales de movilidad alcanzados en los registros del sensor.</p>`;
-    }
-
-    rewardBox.innerHTML = `
-        <h3 style="margin-top: 0; color: #2c3e50;">🏆 Evaluación de Actividad por Acelerometría</h3>
-        <p style="margin: 5px 0;"><strong>Puntaje Acumulado:</strong> <span style="font-size: 1.2em; color: #27ae60; font-weight: bold;">${patient.score} Puntos</span> ${rankHtml}</p>
-        <p style="margin: 5px 0;"><strong>Insignia Asignada por Acelerometría:</strong> ${medal} <br><small style="color: #555;">${medalDescription}</small></p>
-        <p style="margin: 5px 0;"><strong>Tiempo en Movimiento (Deambulando):</strong> ${patient.activePercentage}% del total registrado</p>
-        ${analyticalMessage}
-    `;
-}
-
-function drawChart(data, filterCode) {
-    const canvas = document.getElementById('accelerationChart');
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    
-    if (currentChart) {
-        currentChart.destroy();
-    }
-
-    const filteredData = filterCode === 'all' 
-        ? data 
-        : data.filter(d => d.activityCode === filterCode);
-
-    const downsampled = filteredData.filter((_, i) => i % 5 === 0);
-    const labels = downsampled.map(d => d.time.toFixed(2));
-    
-    currentChart = new Chart(ctx, {
+    chartInstance = new Chart(ctx, {
         type: 'line',
         data: {
             labels: labels,
             datasets: [
-                { label: 'Frontal (G)', data: downsampled.map(d => d.accFrontal), borderColor: '#e74c3c', borderWidth: 1, pointRadius: 0 },
-                { label: 'Vertical (G)', data: downsampled.map(d => d.accVertical), borderColor: '#3498db', borderWidth: 1, pointRadius: 0 },
-                { label: 'Lateral (G)', data: downsampled.map(d => d.accLateral), borderColor: '#2ecc71', borderWidth: 1, pointRadius: 0 }
+                { label: 'Acel. Frontal', data: frontal, borderColor: '#3b82f6', borderWidth: 1.5, pointRadius: 0, tension: 0.1 },
+                { label: 'Acel. Vertical', data: vertical, borderColor: '#10b981', borderWidth: 1.5, pointRadius: 0, tension: 0.1 },
+                { label: 'Acel. Lateral', data: lateral, borderColor: '#f59e0b', borderWidth: 1.5, pointRadius: 0, tension: 0.1 }
             ]
         },
         options: {
             responsive: true,
+            maintainAspectRatio: false,
             scales: {
                 x: { title: { display: true, text: 'Tiempo (s)' } },
-                y: { title: { display: true, text: 'Aceleración (G)' } }
+                y: { title: { display: true, text: 'Aceleración' } }
             }
         }
     });
 }
 
-function showError(msg) {
-    const errorBox = document.getElementById('errorBox');
-    if (errorBox) {
-        errorBox.textContent = msg;
-        errorBox.classList.remove('hidden');
-    }
-}
+// ==========================================================
+// INICIALIZACIÓN DE EVENTOS AL CARGAR LA PÁGINA
+// ==========================================================
+document.addEventListener('DOMContentLoaded', () => {
+    const fileInput = document.getElementById('fileInput');
+    const uploadStatus = document.getElementById('uploadStatus');
+    const activityFilter = document.getElementById('activityFilter');
 
-function hideError() {
-    const errorBox = document.getElementById('errorBox');
-    if (errorBox) {
-        errorBox.classList.add('hidden');
+    if (!fileInput) return;
+
+    fileInput.addEventListener('change', async (e) => {
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
+
+        if (uploadStatus) uploadStatus.textContent = "Procesando archivos con el servidor...";
+        hideError();
+        globalPatients = {};
+
+        const patientList = document.getElementById('patientList');
+        if (patientList) patientList.innerHTML = '';
+
+        try {
+            for (const file of files) {
+                const fileNameLower = file.name.toLowerCase();
+                if (fileNameLower.endsWith('.zip')) {
+                    await processZip(file);
+                } else {
+                    await processTextFile(file);
+                }
+            }
+            
+            finishPatientLoading(); 
+            if (uploadStatus) uploadStatus.textContent = "¡Archivos cargados y analizados con éxito!";
+
+        } catch (err) {
+            showError(`Error al procesar el archivo: ${err.message}`);
+            if (uploadStatus) uploadStatus.textContent = "Error en la carga";
+        }
+    });
+
+    if (activityFilter) {
+        activityFilter.addEventListener('change', (e) => {
+            if (activePatientId && globalPatients[activePatientId]) {
+                drawChart(globalPatients[activePatientId].data, e.target.value);
+            }
+        });
     }
-}
+});
