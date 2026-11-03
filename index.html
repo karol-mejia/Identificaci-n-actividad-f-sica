@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Análisis de Acelerometría - Sistema Inteligente</title>
-    <!-- Librerías externas necesarias (JSZip para archivos comprimidos y Chart.js para gráficas) -->
+    <title>Análisis de Acelerometría - Muévete Conmigo y Gana</title>
+    <!-- Librerías externas (JSZip para archivos comprimidos y Chart.js para gráficas) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
@@ -36,6 +36,25 @@
             flex-wrap: wrap;
             gap: 15px;
         }
+        .logo-title-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .logo-img {
+            width: 55px;
+            height: 55px;
+            object-fit: cover;
+            border-radius: 50%;
+            border: 2px solid #3b82f6;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        /* Contenedor infalible para el botón de carga */
+        .upload-btn-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+        }
         .btn-custom {
             background-color: #3b82f6;
             color: white;
@@ -49,6 +68,17 @@
         }
         .btn-custom:hover {
             background-color: #2563eb;
+        }
+        /* El input se posiciona encima de forma invisible pero interactiva */
+        .upload-btn-wrapper input[type=file] {
+            font-size: 100px;
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            cursor: pointer;
+            width: 100%;
+            height: 100%;
         }
         .content-grid {
             display: grid;
@@ -76,24 +106,30 @@
 <body>
 
     <div class="main-container">
-        <!-- Cabecera y Controles de Carga -->
+        <!-- Cabecera con Logo y Controles -->
         <div class="header-section">
-            <h1 style="margin: 0; font-size: 24px; color: #111827;">Análisis de Acelerometría</h1>
+            <div class="logo-title-container">
+                <img src="logo.png" alt="Logo del Proyecto" class="logo-img">
+                <div>
+                    <h1 style="margin: 0; font-size: 22px; color: #111827;">Muévete Conmigo y Gana</h1>
+                    <span style="font-size: 13px; color: #6b7280;">Sistema Inteligente de Acelerometría</span>
+                </div>
+            </div>
+
             <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
-                <!-- Botón visual estético -->
-                <button id="customBtn" class="btn-custom">Cargar Archivos (.zip, .csv, .txt)</button>
+                <!-- Botón de carga con input integrado -->
+                <div class="upload-btn-wrapper">
+                    <button class="btn-custom">Cargar Archivos (.zip, .csv, .txt)</button>
+                    <input type="file" id="fileInput" multiple accept=".zip, .csv, .txt">
+                </div>
                 
-                <!-- Input de archivos real (oculto para que no rompa la interfaz) -->
-                <input type="file" id="fileInput" multiple accept=".zip, .csv, .txt" style="display: none;">
-                
-                <!-- Mensaje de estado -->
                 <span id="uploadStatus">Ningún archivo cargado</span>
             </div>
         </div>
 
         <!-- Contenido Principal -->
         <div class="content-grid">
-            <!-- Columna Izquierda: Lista de Pacientes -->
+            <!-- Columna Izquierda: Pacientes y Ranking -->
             <div class="card">
                 <h3 style="margin-top: 0; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">Pacientes</h3>
                 <div id="patientList">
@@ -117,7 +153,7 @@
         </div>
     </div>
 
-    <!-- Script principal de la aplicación -->
+    <!-- Script principal -->
     <script src="app.js"></script>
 </body>
 </html>
