@@ -58,11 +58,11 @@ async function processZip(file) {
 }
 
 // ==========================================================
-// ENVÍO DE ARCHIVOS AL BACKEND (RENDER)
+// ENVÍO DE ARCHIVOS AL BACKEND (RENDER) Y ACUMULACIÓN
 // ==========================================================
 async function processTextFile(file) {
     const formData = new FormData();
-    formData.append('file', file); // Archivo .csv o .txt seleccionado
+    formData.append('file', file);
 
     try {
         const response = await fetch('https://backend-acelerometria.onrender.com/analizar', {
@@ -77,11 +77,24 @@ async function processTextFile(file) {
 
         const data = await response.json();
         
+        // Acumular registros si el paciente ya tiene datos de otra actividad cargada
         if (data && data.id) {
-            globalPatients[data.id] = data;
+            if (globalPatients[data.id]) {
+                globalPatients[data.id].data = globalPatients[data.id].data.concat(data.data);
+                globalPatients[data.id].totalRecords += data.totalRecords;
+                globalPatients[data.id].totalTime += data.totalTime;
+                globalPatients[data.id].score += data.score;
+                
+                for (let [code, count] of Object.entries(data.activityCounts)) {
+                    globalPatients[data.id].activityCounts[code] = (globalPatients[data.id].activityCounts[code] || 0) + count;
+                }
+                globalPatients[data.id].activePercentage = parseFloat(((globalPatients[data.id].activePercentage + data.activePercentage) / 2).toFixed(1));
+            } else {
+                globalPatients[data.id] = data;
+            }
         }
         
-        console.log("¡Resultado recibido con éxito del backend!", data);
+        console.log("¡Resultado procesado y acumulado con éxito!", data);
         return data;
 
     } catch (error) {
@@ -105,7 +118,6 @@ function finishPatientLoading() {
         return;
     }
 
-    // Ordenar pacientes por puntaje de mayor a menor (Podio)
     patientIds.sort((a, b) => globalPatients[b].score - globalPatients[a].score);
 
     patientIds.forEach((id, index) => {
@@ -142,7 +154,6 @@ function finishPatientLoading() {
         patientList.appendChild(item);
     });
 
-    // Seleccionar automáticamente al primer paciente del ranking al terminar
     if (patientIds.length > 0) {
         activePatientId = patientIds[0];
         const firstItem = patientList.firstChild;
@@ -163,7 +174,6 @@ function drawChart(records, activityFilter) {
         filteredRecords = records.filter(r => String(r.activityCode) === String(activityFilter));
     }
 
-    // Muestreo optimizado para que la gráfica cargue de forma fluida
     const step = Math.max(1, Math.floor(filteredRecords.length / 600));
     const sampled = filteredRecords.filter((_, i) => i % step === 0);
 
