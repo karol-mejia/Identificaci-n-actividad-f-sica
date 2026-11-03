@@ -71,14 +71,25 @@ async function processTextFile(file) {
         });
         if (!response.ok) throw new Error('Error en el servidor');
         const data = await response.json();
+        
         if (data && data.id) {
-            globalPatients[data.id] = data;
+            if (globalPatients[data.id]) {
+                // Si el paciente ya existe, sumamos sus registros y puntajes acumulados
+                globalPatients[data.id].totalRecords += data.totalRecords;
+                globalPatients[data.id].score += data.score;
+                
+                // Combinar el desglose de actividades si existe
+                if (data.activityBreakdown) {
+                    globalPatients[data.id].activityBreakdown = globalPatients[data.id].activityBreakdown.concat(data.activityBreakdown);
+                }
+            } else {
+                globalPatients[data.id] = data;
+            }
         }
     } catch (err) {
         console.warn('Archivo omitido:', err);
     }
 }
-
 function finishPatientLoading() {
     const patientList = document.getElementById('patientList');
     if (!patientList) return;
