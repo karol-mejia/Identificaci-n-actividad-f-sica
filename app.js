@@ -63,7 +63,7 @@ async function processZip(file) {
 }
 
 // ==========================================================
-// ENVÍO DE ARCHIVOS AL BACKEND Y UNIFICACIÓN INTELIGENTE
+// ENVÍO DE ARCHIVOS AL BACKEND Y UNIFICACIÓN
 // ==========================================================
 async function processTextFile(file) {
     const formData = new FormData();
@@ -84,17 +84,14 @@ async function processTextFile(file) {
         
         if (data && data.id) {
             if (globalPatients[data.id]) {
-                // Unir los datos de las señales
                 globalPatients[data.id].data = globalPatients[data.id].data.concat(data.data);
                 globalPatients[data.id].totalRecords += data.totalRecords;
                 globalPatients[data.id].totalTime += data.totalTime;
                 
-                // Combinar conteos de actividades
                 for (let [code, count] of Object.entries(data.activityCounts)) {
                     globalPatients[data.id].activityCounts[code] = (globalPatients[data.id].activityCounts[code] || 0) + count;
                 }
                 
-                // Recalcular puntaje global y porcentaje activo de forma precisa
                 const totalRecs = globalPatients[data.id].totalRecords;
                 const counts = globalPatients[data.id].activityCounts;
                 const ptsConfig = {'1': 0.5, '2': 0.0, '3': 2.0, '4': 2.0};
@@ -185,7 +182,7 @@ function finishPatientLoading() {
 }
 
 // ==========================================================
-// CREAR O ACTUALIZAR EL PANEL DE INFORMACIÓN DEL PACIENTE
+// PANEL DE INFORMACIÓN DETALLADA DEL PACIENTE
 // ==========================================================
 function showPatientInfo(patient) {
     let infoPanel = document.getElementById('patientInfoPanel');
@@ -203,11 +200,14 @@ function showPatientInfo(patient) {
     infoPanel.innerHTML = `
         <div>
             <h3 style="margin: 0 0 5px 0; color: #1e293b; font-size: 18px;">👤 ${patient.id}</h3>
-            <span style="font-size: 13px; color: #64748b;">Género: <b>${patient.gender}</b></span>
+            <div style="font-size: 13px; color: #64748b; display: flex; gap: 15px;">
+                <span>Género: <b>${patient.gender}</b></span>
+                <span>Edad: <b>${patient.age} años</b></span>
+                <span>Peso: <b>${patient.weight} kg</b></span>
+            </div>
         </div>
         <div style="display: flex; gap: 20px; font-size: 14px; color: #334155;">
-            <div>⏱️ Tiempo Total: <b>${patient.totalTime} s</b></div>
-            <div>📊 Registros: <b>${patient.totalRecords}</b></div>
+            <div>⏱️ Tiempo: <b>${patient.totalTime} s</b></div>
             <div>🏆 Puntaje: <b style="color: #2563eb;">${patient.score} pts</b></div>
             <div>⚡ Actividad: <b style="color: #16a34a;">${patient.activePercentage}%</b></div>
         </div>
