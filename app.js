@@ -60,6 +60,7 @@ async function processTextFile(file) {
         const data = await response.json();
         
         if (data && data.id) {
+            // Unificación inteligente de archivos bajo el mismo paciente
             if (globalPatients[data.id]) {
                 globalPatients[data.id].totalRecords += data.totalRecords;
                 globalPatients[data.id].score += data.score;
@@ -137,33 +138,31 @@ function renderPatientDashboard(patient, rank, totalPatients) {
         mainContainer.appendChild(dash);
     }
 
-    // Sistema de respaldo inteligente: garantiza que la tabla SIEMPRE tenga filas
     let rowsHtml = '';
-    let breakdown = patient.activityBreakdown;
-    
-    if (!breakdown || breakdown.length === 0) {
-        breakdown = [{
-            activity: "Actividad Registrada",
-            time: patient.totalTime || "10 s",
-            percentage: `${patient.activePercentage || 100.0}%`,
-            points: `+${patient.score || 100} pts`
-        }];
-    }
-
-    breakdown.forEach(row => {
-        rowsHtml += `
-            <tr style="border-bottom: 1px solid #f1f5f9;">
-                <td style="padding: 12px; font-weight: 500; color: #334155;">${row.activity}</td>
-                <td style="padding: 12px; color: #475569;">${row.time}</td>
-                <td style="padding: 12px;"><span style="background: #f1f5f9; padding: 4px 8px; border-radius: 4px; font-size: 13px; font-weight: bold;">${row.percentage}</span></td>
-                <td style="padding: 12px; color: #16a34a; font-weight: bold;">${row.points}</td>
+    if (patient.activityBreakdown && patient.activityBreakdown.length > 0) {
+        patient.activityBreakdown.forEach(row => {
+            rowsHtml += `
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                    <td style="padding: 12px; font-weight: 500; color: #334155;">${row.activity}</td>
+                    <td style="padding: 12px; color: #475569;">${row.time}</td>
+                    <td style="padding: 12px;"><span style="background: #f1f5f9; padding: 4px 8px; border-radius: 4px; font-size: 13px; font-weight: bold;">${row.percentage}</span></td>
+                    <td style="padding: 12px; color: #16a34a; font-weight: bold;">${row.points}</td>
+                </tr>
+            `;
+        });
+    } else {
+        rowsHtml = `
+            <tr>
+                <td colspan="4" style="padding: 15px; text-align: center; color: #64748b; font-style: italic;">
+                    No hay desglose de actividades disponible para este registro.
+                </td>
             </tr>
         `;
-    });
+    }
 
     dash.innerHTML = `
         <h2 style="margin-top: 0; color: #1e293b; font-size: 22px;">Datos del Paciente: ${patient.id}</h2>
-        <div style="font-size: 14px; color: #475569; margin-bottom: 20px; display: flex; gap: 30px;">
+        <div style="font-size: 14px; color: #475569; margin-bottom: 20px; display: flex; gap: 30px; flex-wrap: wrap;">
             <div>Género: <b>${patient.gender}</b></div>
             <div>Registros Totales: <b>${patient.totalRecords}</b></div>
             <div>Tiempo Total: <b>${patient.totalTime}</b></div>
