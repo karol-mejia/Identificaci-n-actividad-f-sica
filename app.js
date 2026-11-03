@@ -1,13 +1,7 @@
-// ==========================================================
-// VARIABLES GLOBALES DE LA APLICACIÓN
-// ==========================================================
 let globalPatients = {};
 let activePatientId = null;
 let chartInstance = null;
 
-// ==========================================================
-// GESTIÓN DE ERRORES EN INTERFAZ (Versión Segura)
-// ==========================================================
 function showError(message) {
     let errorDiv = document.getElementById('errorBanner');
     const container = document.querySelector('.main-container') || document.body;
@@ -16,7 +10,7 @@ function showError(message) {
         errorDiv = document.createElement('div');
         errorDiv.id = 'errorBanner';
         errorDiv.style.cssText = 'background: #fee2e2; color: #b91c1c; padding: 12px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #fecaca; font-size: 14px;';
-        container.prepend(errorDiv); // Usar prepend evita fallos de nodos hijos
+        container.appendChild(errorDiv); // Uso exclusivo de appendChild para evitar fallos de nodos
     }
     errorDiv.textContent = message;
     errorDiv.style.display = 'block';
@@ -24,18 +18,11 @@ function showError(message) {
 
 function hideError() {
     const errorDiv = document.getElementById('errorBanner');
-    if (errorDiv) {
-        errorDiv.style.display = 'none';
-    }
+    if (errorDiv) errorDiv.style.display = 'none';
 }
 
-// ==========================================================
-// LECTURA DE ARCHIVOS COMPRIMIDOS (ZIP)
-// ==========================================================
 async function processZip(file) {
-    if (typeof JSZip === 'undefined') {
-        throw new Error("La librería JSZip no está cargada.");
-    }
+    if (typeof JSZip === 'undefined') throw new Error("JSZip no está cargado.");
     const zip = new JSZip();
     const contents = await zip.loadAsync(file);
     
@@ -44,7 +31,7 @@ async function processZip(file) {
         const filename = relativePath.split('/').pop();
         if (filename && !filename.startsWith('.') && !filename.toLowerCase().includes('readme')) {
             const lowerName = filename.toLowerCase();
-            if (lowerName.endsWith('.csv') || lowerName.endsWith('.txt') || !lowerName.includes('.')) {
+            if (lowerName.endsWith('.csv') || lowerName.endsWith('.txt'] || !lowerName.includes('.')) {
                 try {
                     const text = await zipEntry.async("string");
                     if (text.trim().length > 0) {
@@ -73,23 +60,13 @@ async function processTextFile(file) {
         const data = await response.json();
         
         if (data && data.id) {
-            if (globalPatients[data.id]) {
-                // Si el paciente ya existe, sumamos sus registros y puntajes acumulados
-                globalPatients[data.id].totalRecords += data.totalRecords;
-                globalPatients[data.id].score += data.score;
-                
-                // Combinar el desglose de actividades si existe
-                if (data.activityBreakdown) {
-                    globalPatients[data.id].activityBreakdown = globalPatients[data.id].activityBreakdown.concat(data.activityBreakdown);
-                }
-            } else {
-                globalPatients[data.id] = data;
-            }
+            globalPatients[data.id] = data;
         }
     } catch (err) {
         console.warn('Archivo omitido:', err);
     }
 }
+
 function finishPatientLoading() {
     const patientList = document.getElementById('patientList');
     if (!patientList) return;
@@ -108,15 +85,11 @@ function finishPatientLoading() {
         const item = document.createElement('div');
         item.style.cssText = 'padding: 12px; margin-bottom: 10px; border-radius: 8px; background: white; border: 1px solid #e5e7eb; cursor: pointer; transition: all 0.2s;';
         
-        let rankBadge = '';
-        if (index === 0) rankBadge = '🥇 1er Lugar';
-        else if (index === 1) rankBadge = '🥈 2do Lugar';
-        else if (index === 2) rankBadge = '🥉 3er Lugar';
-        else rankBadge = `#${index + 1}`;
+        let rankBadge = index === 0 ? '🥇 1er Lugar' : (index === 1 ? '🥈 2do Lugar' : (index === 2 ? '🥉 3er Lugar' : `#${index + 1}`));
 
         item.innerHTML = `
             <div style="display: flex; justify-content: space-between; align-items: center;">
-                <strong>${patient.id}</strong>
+                <strong>👤 ${patient.id}</strong>
                 <span style="font-size: 11px; background: #e0f2fe; color: #0369a1; padding: 3px 8px; border-radius: 4px; font-weight: bold;">${rankBadge}</span>
             </div>
             <div style="font-size: 13px; color: #4b5563; margin-top: 6px;">
@@ -201,7 +174,7 @@ function renderPatientDashboard(patient, rank, totalPatients) {
             <div style="font-size: 14px; color: #334155; line-height: 1.6;">
                 Puntaje de Actividad: <b style="color: #16a34a;">${patient.score} Puntos</b> | Posición: <b>#${rank} de ${totalPatients}</b><br>
                 Insignia Obtenida: 🏅 <b>${patient.badge}</b><br>
-                Tiempo en Movimiento (Deambulando): <b>${patient.activePercentage}% del total</b>
+                Tiempo en Movimiento: <b>${patient.activePercentage}% del total</b>
             </div>
         </div>
     `;
