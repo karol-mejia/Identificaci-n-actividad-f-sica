@@ -29,7 +29,7 @@ function hideError() {
 }
 
 // ==========================================================
-// LECTURA DE ARCHIVOS COMPRIMIDOS (ZIP) IGNORANDO README
+// LECTURA DE ARCHIVOS COMPRIMIDOS (ZIP)
 // ==========================================================
 async function processZip(file) {
     if (typeof JSZip === 'undefined') {
@@ -44,7 +44,6 @@ async function processZip(file) {
         }
         const filename = relativePath.split('/').pop();
         
-        // Ignorar archivos README o texto informativo que no son datos de sensores
         if (filename && !filename.startsWith('.') && !filename.toLowerCase().includes('readme')) {
             const lowerName = filename.toLowerCase();
             if (lowerName.endsWith('.csv') || lowerName.endsWith('.txt') || lowerName.endsWith('.text') || !lowerName.includes('.')) {
@@ -64,11 +63,7 @@ async function processZip(file) {
 }
 
 // ==========================================================
-<<<<<<< HEAD
 // ENVÍO DE ARCHIVOS AL BACKEND Y ACUMULACIÓN POR PACIENTE
-=======
-// ENVÍO DE ARCHIVOS AL BACKEND (RENDER) Y ACUMULACIÓN
->>>>>>> d6bb69e38b429c50b0c33c73c18f0dae75b91451
 // ==========================================================
 async function processTextFile(file) {
     const formData = new FormData();
@@ -87,7 +82,6 @@ async function processTextFile(file) {
 
         const data = await response.json();
         
-        // Acumular registros si el paciente ya tiene datos de otra actividad cargada
         if (data && data.id) {
             if (globalPatients[data.id]) {
                 globalPatients[data.id].data = globalPatients[data.id].data.concat(data.data);
@@ -107,7 +101,6 @@ async function processTextFile(file) {
 
     } catch (error) {
         console.warn('Archivo omitido por el servidor:', error);
-        // No lanzamos error global para permitir que los demás archivos del ZIP sigan procesándose
     }
 }
 
