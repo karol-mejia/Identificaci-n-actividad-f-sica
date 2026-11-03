@@ -63,7 +63,7 @@ async function processZip(file) {
 }
 
 // ==========================================================
-// ENVÍO DE ARCHIVOS AL BACKEND Y ACUMULACIÓN POR PACIENTE
+// ENVÍO DE ARCHIVOS AL BACKEND Y UNIFICACIÓN INTELIGENTE
 // ==========================================================
 async function processTextFile(file) {
     const formData = new FormData();
@@ -84,15 +84,34 @@ async function processTextFile(file) {
         
         if (data && data.id) {
             if (globalPatients[data.id]) {
+                // Unir los datos de las señales
                 globalPatients[data.id].data = globalPatients[data.id].data.concat(data.data);
                 globalPatients[data.id].totalRecords += data.totalRecords;
                 globalPatients[data.id].totalTime += data.totalTime;
-                globalPatients[data.id].score += data.score;
                 
+                // Combinar conteos de actividades
                 for (let [code, count] of Object.entries(data.activityCounts)) {
                     globalPatients[data.id].activityCounts[code] = (globalPatients[data.id].activityCounts[code] || 0) + count;
                 }
-                globalPatients[data.id].activePercentage = parseFloat(((globalPatients[data.id].activePercentage + data.activePercentage) / 2).toFixed(1));
+                
+                // Recalcular puntaje global y porcentaje activo de forma precisa
+                const totalRecs = globalPatients[data.id].totalRecords;
+                const counts = globalPatients[data.id].activityCounts;
+                const ptsConfig = {'1': 0.5, '2': 0.0, '3': 2.0, '4': 2.0};
+                let newScore = 0;
+                let activeRecs = 0;
+                const totalT = globalPatients[data.id].totalTime;
+
+                for (let [code, count] of Object.entries(counts)) {
+                    const ptsPerSec = ptsConfig[code] || 0.5;
+                    const timeFraction = count / totalRecs;
+                    newScore += (timeFraction * totalT) * ptsPerSec;
+                    if (code === '3' || code === '4') {
+                        activeRecs += count;
+                    }
+                }
+                globalPatients[data.id].score = Math.round(newScore);
+                globalPatients[data.id].activePercentage = totalRecs > 0 ? parseFloat(((activeRecs / totalRecs) * 100).toFixed(1)) : 0.0;
             } else {
                 globalPatients[data.id] = data;
             }
@@ -105,7 +124,7 @@ async function processTextFile(file) {
 }
 
 // ==========================================================
-// RENDERIZADO DE PACIENTES Y PODIO
+// RENDERIZADO DE PACIENTES Y PANEL DE INFORMACIÓN DETALLADA
 // ==========================================================
 function finishPatientLoading() {
     const patientList = document.getElementById('patientList');
@@ -147,6 +166,7 @@ function finishPatientLoading() {
             item.style.borderColor = '#3b82f6';
             activePatientId = id;
             
+            showPatientInfo(patient);
             const filterSelect = document.getElementById('activityFilter');
             const filterVal = filterSelect ? filterSelect.value : 'all';
             drawChart(patient.data, filterVal);
@@ -159,8 +179,39 @@ function finishPatientLoading() {
         activePatientId = patientIds[0];
         const firstItem = patientList.firstChild;
         if (firstItem) firstItem.style.borderColor = '#3b82f6';
+        showPatientInfo(globalPatients[activePatientId]);
         drawChart(globalPatients[activePatientId].data, 'all');
     }
+}
+
+// ==========================================================
+// CREAR O ACTUALIZAR EL PANEL DE INFORMACIÓN DEL PACIENTE
+// ==========================================================
+function showPatientInfo(patient) {
+    let infoPanel = document.getElementById('patientInfoPanel');
+    const container = document.querySelector('.main-container') || document.body;
+
+    if (!infoPanel) {
+        infoPanel = document.createElement('div');
+        infoPanel.id = 'patientInfoPanel';
+        infoPanel.style.cssText = 'background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 15px; align-items: center;';
+        
+        const chartSection = document.querySelector('div:has(#activityChart)') || container;
+        container.insertBefore(infoPanel, chartSection);
+    }
+
+    infoPanel.innerHTML = `
+        <div>
+            <h3 style="margin: 0 0 5px 0; color: #1e293b; font-size: 18px;">👤 ${patient.id}</h3>
+            <span style="font-size: 13px; color: #64748b;">Género: <b>${patient.gender}</b></span>
+        </div>
+        <div style="display: flex; gap: 20px; font-size: 14px; color: #334155;">
+            <div>⏱️ Tiempo Total: <b>${patient.totalTime} s</b></div>
+            <div>📊 Registros: <b>${patient.totalRecords}</b></div>
+            <div>🏆 Puntaje: <b style="color: #2563eb;">${patient.score} pts</b></div>
+            <div>⚡ Actividad: <b style="color: #16a34a;">${patient.activePercentage}%</b></div>
+        </div>
+    `;
 }
 
 // ==========================================================
