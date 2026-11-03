@@ -1,7 +1,37 @@
+// ==========================================================
+// VARIABLES GLOBALES DE LA APLICACIÓN
+// ==========================================================
 let globalPatients = {};
 let activePatientId = null;
 let chartInstance = null;
 
+// ==========================================================
+// GESTIÓN DE ERRORES EN INTERFAZ (Versión Segura)
+// ==========================================================
+function showError(message) {
+    let errorDiv = document.getElementById('errorBanner');
+    const container = document.querySelector('.main-container') || document.body;
+    
+    if (!errorDiv) {
+        errorDiv = document.createElement('div');
+        errorDiv.id = 'errorBanner';
+        errorDiv.style.cssText = 'background: #fee2e2; color: #b91c1c; padding: 12px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #fecaca; font-size: 14px;';
+        container.prepend(errorDiv); // Usar prepend evita fallos de nodos hijos
+    }
+    errorDiv.textContent = message;
+    errorDiv.style.display = 'block';
+}
+
+function hideError() {
+    const errorDiv = document.getElementById('errorBanner');
+    if (errorDiv) {
+        errorDiv.style.display = 'none';
+    }
+}
+
+// ==========================================================
+// LECTURA DE ARCHIVOS COMPRIMIDOS (ZIP)
+// ==========================================================
 async function processZip(file) {
     if (typeof JSZip === 'undefined') {
         throw new Error("La librería JSZip no está cargada.");
@@ -68,18 +98,18 @@ function finishPatientLoading() {
         item.style.cssText = 'padding: 12px; margin-bottom: 10px; border-radius: 8px; background: white; border: 1px solid #e5e7eb; cursor: pointer; transition: all 0.2s;';
         
         let rankBadge = '';
-        if (index === 0) rankBadge = '🥇';
-        else if (index === 1) rankBadge = '🥈';
-        else if (index === 2) rankBadge = '🥉';
+        if (index === 0) rankBadge = '🥇 1er Lugar';
+        else if (index === 1) rankBadge = '🥈 2do Lugar';
+        else if (index === 2) rankBadge = '🥉 3er Lugar';
         else rankBadge = `#${index + 1}`;
 
         item.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="font-size: 16px;">${rankBadge}</span>
-                <div>
-                    <strong>👤 ${patient.id}</strong>
-                    <div style="font-size: 13px; color: #16a34a; font-weight: bold; margin-top: 2px;">${patient.score} pts</div>
-                </div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <strong>${patient.id}</strong>
+                <span style="font-size: 11px; background: #e0f2fe; color: #0369a1; padding: 3px 8px; border-radius: 4px; font-weight: bold;">${rankBadge}</span>
+            </div>
+            <div style="font-size: 13px; color: #4b5563; margin-top: 6px;">
+                Puntaje: <b>${patient.score} pts</b> | Activo: <b>${patient.activePercentage}%</b>
             </div>
         `;
 
@@ -110,10 +140,8 @@ function renderPatientDashboard(patient, rank, totalPatients) {
     if (!dash) {
         dash = document.createElement('div');
         dash.id = 'patientDashboardView';
-        dash.style.cssText = 'background: white; border-radius: 10px; padding: 25px; border: 1px solid #e5e7eb;';
-        
-        const rightPanel = document.querySelector('div:has(#activityChart)')?.parentNode || mainContainer;
-        rightPanel.appendChild(dash);
+        dash.style.cssText = 'background: white; border-radius: 10px; padding: 25px; border: 1px solid #e5e7eb; margin-top: 20px;';
+        mainContainer.appendChild(dash);
     }
 
     let rowsHtml = '';
@@ -133,20 +161,20 @@ function renderPatientDashboard(patient, rank, totalPatients) {
     dash.innerHTML = `
         <h2 style="margin-top: 0; color: #1e293b; font-size: 22px;">Datos del Paciente: ${patient.id}</h2>
         <div style="font-size: 14px; color: #475569; margin-bottom: 20px; display: flex; gap: 30px;">
-            <div>Género: <b>${patient.gender}</b>[cite: 8]</div>
-            <div>Registros Totales: <b>${patient.totalRecords}</b>[cite: 8]</div>
-            <div>Tiempo Total: <b>${patient.totalTime}</b>[cite: 8]</div>
+            <div>Género: <b>${patient.gender}</b></div>
+            <div>Registros Totales: <b>${patient.totalRecords}</b></div>
+            <div>Tiempo Total: <b>${patient.totalTime}</b></div>
         </div>
 
-        <h3 style="color: #1e293b; font-size: 18px; margin-bottom: 10px;">Resumen de Actividades[cite: 8]</h3>
+        <h3 style="color: #1e293b; font-size: 18px; margin-bottom: 10px;">Resumen de Actividades</h3>
         <div style="overflow-x: auto; margin-bottom: 25px;">
             <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 14px;">
                 <thead>
                     <tr style="border-bottom: 2px solid #e2e8f0; color: #64748b;">
-                        <th style="padding: 10px;">Actividad[cite: 8]</th>
-                        <th style="padding: 10px;">Tiempo Estimado[cite: 8]</th>
-                        <th style="padding: 10px;">Porcentaje (%)[cite: 8]</th>
-                        <th style="padding: 10px;">Puntos Ganados[cite: 8]</th>
+                        <th style="padding: 10px;">Actividad</th>
+                        <th style="padding: 10px;">Tiempo Estimado</th>
+                        <th style="padding: 10px;">Porcentaje (%)</th>
+                        <th style="padding: 10px;">Puntos Ganados</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -157,12 +185,12 @@ function renderPatientDashboard(patient, rank, totalPatients) {
 
         <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #10b981; padding: 20px; border-radius: 8px;">
             <div style="display: flex; align-items: center; gap: 8px; font-weight: bold; color: #1e293b; font-size: 16px; margin-bottom: 10px;">
-                🏆 Sistema de Recompensas[cite: 8]
+                🏆 Sistema de Recompensas
             </div>
             <div style="font-size: 14px; color: #334155; line-height: 1.6;">
-                Puntaje de Actividad: <b style="color: #16a34a;">${patient.score} Puntos</b> | Posición: <b>#${rank} de ${totalPatients}</b>[cite: 8]<br>
-                Insignia Obtenida: 🏅 <b>${patient.badge}</b>[cite: 8]<br>
-                Tiempo en Movimiento (Deambulando): <b>${patient.activePercentage}% del total</b>[cite: 8]
+                Puntaje de Actividad: <b style="color: #16a34a;">${patient.score} Puntos</b> | Posición: <b>#${rank} de ${totalPatients}</b><br>
+                Insignia Obtenida: 🏅 <b>${patient.badge}</b><br>
+                Tiempo en Movimiento (Deambulando): <b>${patient.activePercentage}% del total</b>
             </div>
         </div>
     `;
@@ -170,7 +198,7 @@ function renderPatientDashboard(patient, rank, totalPatients) {
 
 function drawChart(records) {
     const ctx = document.getElementById('activityChart');
-    if (!ctx) return;
+    if (!ctx || !records) return;
 
     const step = Math.max(1, Math.floor(records.length / 600));
     const sampled = records.filter((_, i) => i % step === 0);
@@ -214,6 +242,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (files.length === 0) return;
 
         if (uploadStatus) uploadStatus.textContent = "Procesando archivos...";
+        hideError();
         globalPatients = {};
 
         try {
@@ -227,6 +256,7 @@ document.addEventListener('DOMContentLoaded', () => {
             finishPatientLoading();
             if (uploadStatus) uploadStatus.textContent = "¡Cargado con éxito!";
         } catch (err) {
+            showError(`Error al procesar el archivo: ${err.message}`);
             if (uploadStatus) uploadStatus.textContent = "Error en la carga";
         }
     });
