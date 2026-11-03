@@ -29,7 +29,7 @@ function hideError() {
 }
 
 // ==========================================================
-// LECTURA DE ARCHIVOS COMPRIMIDOS (ZIP)
+// LECTURA DE ARCHIVOS COMPRIMIDOS (ZIP) IGNORANDO README
 // ==========================================================
 async function processZip(file) {
     if (typeof JSZip === 'undefined') {
@@ -43,14 +43,20 @@ async function processZip(file) {
             continue;
         }
         const filename = relativePath.split('/').pop();
-        if (filename && !filename.startsWith('.')) {
+        
+        // Ignorar archivos README o texto informativo que no son datos de sensores
+        if (filename && !filename.startsWith('.') && !filename.toLowerCase().includes('readme')) {
             const lowerName = filename.toLowerCase();
             if (lowerName.endsWith('.csv') || lowerName.endsWith('.txt') || lowerName.endsWith('.text') || !lowerName.includes('.')) {
-                const fileDataString = await zipEntry.async("string");
-                if (fileDataString && fileDataString.trim().length > 0) {
-                    const blob = new Blob([fileDataString], { type: 'text/plain' });
-                    const extractedFile = new File([blob], filename, { type: 'text/plain' });
-                    await processTextFile(extractedFile);
+                try {
+                    const fileDataString = await zipEntry.async("string");
+                    if (fileDataString && fileDataString.trim().length > 0) {
+                        const blob = new Blob([fileDataString], { type: 'text/plain' });
+                        const extractedFile = new File([blob], filename, { type: 'text/plain' });
+                        await processTextFile(extractedFile);
+                    }
+                } catch (innerErr) {
+                    console.warn(`No se pudo leer el archivo interno ${filename}:`, innerErr);
                 }
             }
         }
@@ -58,7 +64,11 @@ async function processZip(file) {
 }
 
 // ==========================================================
+<<<<<<< HEAD
+// ENVÍO DE ARCHIVOS AL BACKEND Y ACUMULACIÓN POR PACIENTE
+=======
 // ENVÍO DE ARCHIVOS AL BACKEND (RENDER) Y ACUMULACIÓN
+>>>>>>> d6bb69e38b429c50b0c33c73c18f0dae75b91451
 // ==========================================================
 async function processTextFile(file) {
     const formData = new FormData();
@@ -93,18 +103,16 @@ async function processTextFile(file) {
                 globalPatients[data.id] = data;
             }
         }
-        
-        console.log("¡Resultado procesado y acumulado con éxito!", data);
         return data;
 
     } catch (error) {
-        console.error('Hubo un error al conectar con el backend:', error);
-        throw error;
+        console.warn('Archivo omitido por el servidor:', error);
+        // No lanzamos error global para permitir que los demás archivos del ZIP sigan procesándose
     }
 }
 
 // ==========================================================
-// RENDERIZADO DE PACIENTES Y RANKING (GAMIFICACIÓN)
+// RENDERIZADO DE PACIENTES Y PODIO
 // ==========================================================
 function finishPatientLoading() {
     const patientList = document.getElementById('patientList');
@@ -114,7 +122,7 @@ function finishPatientLoading() {
     const patientIds = Object.keys(globalPatients);
     
     if (patientIds.length === 0) {
-        patientList.innerHTML = '<p style="color: #6b7280; font-style: italic;">No hay pacientes cargados</p>';
+        patientList.innerHTML = '<p style="color: #6b7280; font-style: italic;">No hay pacientes válidos cargados</p>';
         return;
     }
 
