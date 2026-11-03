@@ -3,68 +3,121 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visor de Datos de Actividad Física</title>
-    <link rel="stylesheet" href="styles.css">
-    <!-- Librerías externas -->
+    <title>Análisis de Acelerometría - Sistema Inteligente</title>
+    <!-- Librerías externas necesarias (JSZip para archivos comprimidos y Chart.js para gráficas) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f3f4f6;
+            margin: 0;
+            padding: 20px;
+            color: #1f2937;
+        }
+        .main-container {
+            max-width: 1200px;
+            margin: auto;
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+        .header-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .btn-custom {
+            background-color: #3b82f6;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+        .btn-custom:hover {
+            background-color: #2563eb;
+        }
+        .content-grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 20px;
+        }
+        @media (max-width: 768px) {
+            .content-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        .card {
+            background: #f9fafb;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+        #uploadStatus {
+            font-size: 14px;
+            color: #4b5563;
+            font-weight: 500;
+        }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>Análisis de Acelerometría</h1>
-            <div class="upload-section">
-                <!-- Se agregó 'multiple' para permitir varios archivos y extensiones .txt/.text -->
-                <label for="fileInput" class="btn">Cargar Archivos (.zip, .csv, .txt)</label>
-                <input type="file" id="fileInput" multiple accept=".csv, .txt, .zip">
+
+    <div class="main-container">
+        <!-- Cabecera y Controles de Carga -->
+        <div class="header-section">
+            <h1 style="margin: 0; font-size: 24px; color: #111827;">Análisis de Acelerometría</h1>
+            <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                <!-- Botón visual estético -->
+                <button id="customBtn" class="btn-custom">Cargar Archivos (.zip, .csv, .txt)</button>
+                
+                <!-- Input de archivos real (oculto para que no rompa la interfaz) -->
+                <input type="file" id="fileInput" multiple accept=".zip, .csv, .txt" style="display: none;">
+                
+                <!-- Mensaje de estado -->
                 <span id="uploadStatus">Ningún archivo cargado</span>
             </div>
-        </header>
+        </div>
 
-        <div class="main-content">
-            <aside class="sidebar">
-                <h3>Pacientes</h3>
-                <ul id="patientList">
-                    <li class="empty-msg">Carga un archivo para ver pacientes</li>
-                </ul>
-            </aside>
-
-            <section class="dashboard">
-                <div id="errorBox" class="error-box hidden"></div>
-                
-                <div id="patientInfo" class="info-card hidden">
-                    <h2>Datos del Paciente: <span id="lblId"></span></h2>
-                    <p><strong>Género:</strong> <span id="lblGender"></span></p>
-                    <p><strong>Registros Totales:</strong> <span id="lblRecords"></span></p>
-                    <p><strong>Tiempo Total:</strong> <span id="lblTime"></span></p>
-                    
-                    <h3>Resumen de Actividades</h3>
-                    <table id="activityTable">
-                        <thead>
-                            <tr>
-                                <th>Actividad</th>
-                                <th>Tiempo Estimado</th>
-                                <th>Porcentaje (%)</th>
-                                <th>Puntos Ganados</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
+        <!-- Contenido Principal -->
+        <div class="content-grid">
+            <!-- Columna Izquierda: Lista de Pacientes -->
+            <div class="card">
+                <h3 style="margin-top: 0; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">Pacientes</h3>
+                <div id="patientList">
+                    <p style="color: #6b7280; font-style: italic;">Carga un archivo para ver pacientes</p>
                 </div>
+            </div>
 
-                <div id="chartContainer" class="chart-card hidden">
-                    <h3>Gráfica de Aceleración</h3>
-                    <select id="activityFilter">
+            <!-- Columna Derecha: Gráficas y Filtros -->
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 style="margin: 0;">Visualización de Señales</h3>
+                    <select id="activityFilter" style="padding: 8px; border-radius: 6px; border: 1px solid #d1d5db;">
                         <option value="all">Todas las actividades</option>
-                        <option value="1">Sentado en una silla</option>
-                        <option value="2">Acostado</option>
-                        <option value="3">Deambulando</option>
+                        <option value="1">Actividad 1</option>
+                        <option value="2">Actividad 2</option>
+                        <option value="3">Actividad 3</option>
                     </select>
-                    <canvas id="accelerationChart"></canvas>
                 </div>
-            </section>
+                <canvas id="activityChart"></canvas>
+            </div>
         </div>
     </div>
+
+    <!-- Script principal de la aplicación -->
     <script src="app.js"></script>
 </body>
 </html>
