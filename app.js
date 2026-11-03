@@ -64,8 +64,30 @@ async function processTextFile(file) {
                 globalPatients[data.id].totalRecords += data.totalRecords;
                 globalPatients[data.id].score += data.score;
                 globalPatients[data.id].data = globalPatients[data.id].data.concat(data.data);
+                
+                // Sumar tiempo total acumulado
+                let t1 = parseInt(globalPatients[data.id].totalTime) || 0;
+                let t2 = parseInt(data.totalTime) || 0;
+                globalPatients[data.id].totalTime = `${t1 + t2} s`;
+
                 if (data.activityBreakdown) {
-                    globalPatients[data.id].activityBreakdown = globalPatients[data.id].activityBreakdown.concat(data.activityBreakdown);
+                    if (!globalPatients[data.id].activityBreakdown) {
+                        globalPatients[data.id].activityBreakdown = [];
+                    }
+                    data.activityBreakdown.forEach(newAct => {
+                        let existing = globalPatients[data.id].activityBreakdown.find(a => a.activity === newAct.activity);
+                        if (existing) {
+                            let et1 = parseInt(existing.time) || 0;
+                            let et2 = parseInt(newAct.time) || 0;
+                            existing.time = `${et1 + et2} s`;
+
+                            let ep1 = parseInt(existing.points.replace('+', '').replace(' pts', '')) || 0;
+                            let ep2 = parseInt(newAct.points.replace('+', '').replace(' pts', '')) || 0;
+                            existing.points = `+${ep1 + ep2} pts`;
+                        } else {
+                            globalPatients[data.id].activityBreakdown.push(newAct);
+                        }
+                    });
                 }
             } else {
                 globalPatients[data.id] = data;
@@ -202,12 +224,16 @@ function drawChart(records) {
     const ctx = document.getElementById('activityChart');
     if (!ctx || !records) return;
 
-    // Conectar el menú desplegable de la interfaz para filtrar por actividad (columna 9)
     const selectFilter = document.querySelector('.visualization-container select') || document.querySelector('select');
     
     let filteredRecords = records;
     if (selectFilter && selectFilter.value && selectFilter.value !== 'Todas las actividades') {
-        const valMap = { 'Sentado en la cama': 1, 'Sentado en una silla': 2, 'Acostado': 3, 'Deambulando': 4 };
+        const valMap = { 
+            'Sentado en la cama': 1, 
+            'Sentado en una silla': 2, 
+            'Acostado': 3, 
+            'Deambulando': 4 
+        };
         const targetCode = valMap[selectFilter.value];
         if (targetCode) {
             filteredRecords = records.filter(r => r.activityCode === targetCode);
@@ -277,7 +303,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
             finishPatientLoading();
-            if (uploadStatus) uploadStatus.textContent = "¡Cargado con éxito!";
+            if (uploadStatus) uploadStatus.textContent = "¡Cargado com éxito!";
         } catch (err) {
             showError(`Error al procesar el archivo: ${err.message}`);
             if (uploadStatus) uploadStatus.textContent = "Error en la carga";
