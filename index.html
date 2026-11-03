@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Análisis de Acelerometría - Muévete Conmigo y Gana</title>
-    <!-- Librerías externas (JSZip para archivos comprimidos y Chart.js para gráficas) -->
+    <!-- Librerías externas -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
@@ -40,16 +40,16 @@
             display: flex;
             align-items: center;
             gap: 15px;
+        }
         .logo-img {
-            width: 65px;
-            height: 65px;
-            object-fit: contain; /* Muestra el logo completo sin recortes */
+            width: 60px;
+            height: 60px;
+            object-fit: contain;
             border-radius: 8px;
             background: #ffffff;
-            padding: 2px;
             border: 1px solid #e5e7eb;
         }
-        /* Contenedor infalible para el botón de carga */
+        /* Contenedor transparente para cubrir el botón con el input de archivos */
         .upload-btn-wrapper {
             position: relative;
             overflow: hidden;
@@ -69,7 +69,6 @@
         .btn-custom:hover {
             background-color: #2563eb;
         }
-        /* El input se posiciona encima de forma invisible pero interactiva */
         .upload-btn-wrapper input[type=file] {
             font-size: 100px;
             position: absolute;
@@ -109,7 +108,8 @@
         <!-- Cabecera con Logo y Controles -->
         <div class="header-section">
             <div class="logo-title-container">
-                <img src="logo.png" alt="Logo del Proyecto" class="logo-img">
+                <!-- Asegúrate de que tu imagen se llame logo.jpeg o cámbialo aquí según corresponda -->
+                <img src="logo.jpeg" alt="Logo del Proyecto" class="logo-img" onerror="this.src='logo.png'">
                 <div>
                     <h1 style="margin: 0; font-size: 22px; color: #111827;">Muévete Conmigo y Gana</h1>
                     <span style="font-size: 13px; color: #6b7280;">Sistema Inteligente de Acelerometría</span>
@@ -117,9 +117,9 @@
             </div>
 
             <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
-                <!-- Botón de carga con input integrado -->
+                <!-- Botón de carga optimizado -->
                 <div class="upload-btn-wrapper">
-                    <button class="btn-custom">Cargar Archivos (.zip, .csv, .txt)</button>
+                    <button class="btn-custom" type="button">Cargar Archivos (.zip, .csv, .txt)</button>
                     <input type="file" id="fileInput" multiple accept=".zip, .csv, .txt">
                 </div>
                 
@@ -129,7 +129,7 @@
 
         <!-- Contenido Principal -->
         <div class="content-grid">
-            <!-- Columna Izquierda: Pacientes y Ranking -->
+            <!-- Columna Izquierda: Pacientes -->
             <div class="card">
                 <h3 style="margin-top: 0; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">Pacientes</h3>
                 <div id="patientList">
@@ -137,7 +137,7 @@
                 </div>
             </div>
 
-            <!-- Columna Derecha: Gráficas y Filtros -->
+            <!-- Columna Derecha: Gráficas -->
             <div class="card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                     <h3 style="margin: 0;">Visualización de Señales</h3>
@@ -148,7 +148,9 @@
                         <option value="3">Actividad 3</option>
                     </select>
                 </div>
-                <canvas id="activityChart"></canvas>
+                <div style="position: relative; height: 350px;">
+                    <canvas id="activityChart"></canvas>
+                </div>
             </div>
         </div>
     </div>
