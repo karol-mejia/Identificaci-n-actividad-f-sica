@@ -60,7 +60,6 @@ async function processTextFile(file) {
         const data = await response.json();
         
         if (data && data.id) {
-            // Unificación inteligente: si el paciente ya existe, acumulamos sus registros y puntos
             if (globalPatients[data.id]) {
                 globalPatients[data.id].totalRecords += data.totalRecords;
                 globalPatients[data.id].score += data.score;
@@ -138,14 +137,13 @@ function renderPatientDashboard(patient, rank, totalPatients) {
         mainContainer.appendChild(dash);
     }
 
-    // Respaldo garantizado para la tabla de actividades
     let rowsHtml = '';
     let breakdown = patient.activityBreakdown;
     
     if (!breakdown || breakdown.length === 0) {
         breakdown = [{
-            activity: "Actividad Registrada",
-            time: patient.totalTime || "35 s",
+            activity: "Actividad General",
+            time: patient.totalTime || "10 s",
             percentage: `${patient.activePercentage || 100.0}%`,
             points: `+${patient.score || 100} pts`
         }];
@@ -204,8 +202,29 @@ function drawChart(records) {
     const ctx = document.getElementById('activityChart');
     if (!ctx || !records) return;
 
-    const step = Math.max(1, Math.floor(records.length / 600));
-    const sampled = records.filter((_, i) => i % step === 0);
+    // Conectar el menú desplegable de la interfaz para filtrar por actividad (columna 9)
+    const selectFilter = document.querySelector('.visualization-container select') || document.querySelector('select');
+    
+    let filteredRecords = records;
+    if (selectFilter && selectFilter.value && selectFilter.value !== 'Todas las actividades') {
+        const valMap = { 'Sentado en la cama': 1, 'Sentado en una silla': 2, 'Acostado': 3, 'Deambulando': 4 };
+        const targetCode = valMap[selectFilter.value];
+        if (targetCode) {
+            filteredRecords = records.filter(r => r.activityCode === targetCode);
+        }
+    }
+
+    if (selectFilter && !selectFilter.dataset.listenerAdded) {
+        selectFilter.addEventListener('change', () => {
+            if (activePatientId && globalPatients[activePatientId]) {
+                drawChart(globalPatients[activePatientId].data);
+            }
+        });
+        selectFilter.dataset.listenerAdded = 'true';
+    }
+
+    const step = Math.max(1, Math.floor(filteredRecords.length / 600));
+    const sampled = filteredRecords.filter((_, i) => i % step === 0);
 
     const labels = sampled.map(r => r.time);
     const frontal = sampled.map(r => r.accFrontal);
@@ -229,7 +248,7 @@ function drawChart(records) {
             maintainAspectRatio: false,
             scales: {
                 x: { title: { display: true, text: 'Tiempo (s)' } },
-                y: { title: { display: true, text: 'Aceleración' } }
+                y: { title: { display: true, text: 'Aceleración (G)' } }
             }
         }
     });
