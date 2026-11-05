@@ -21,6 +21,23 @@ function hideError() {
     if (errorDiv) errorDiv.style.display = 'none';
 }
 
+// Función para limpiar completamente el estado anterior antes de una nueva carga
+function resetDashboard() {
+    globalPatients = {};
+    activePatientId = null;
+    
+    if (chartInstance) {
+        chartInstance.destroy();
+        chartInstance = null;
+    }
+    
+    const patientList = document.getElementById('patientList');
+    if (patientList) patientList.innerHTML = '';
+    
+    const dash = document.getElementById('patientDashboardView');
+    if (dash) dash.innerHTML = '';
+}
+
 async function processZip(file) {
     if (typeof JSZip === 'undefined') throw new Error("JSZip no está cargado.");
     const zip = new JSZip();
@@ -31,7 +48,7 @@ async function processZip(file) {
         const filename = relativePath.split('/').pop();
         if (filename && !filename.startsWith('.') && !filename.toLowerCase().includes('readme')) {
             const lowerName = filename.toLowerCase();
-            if (lowerName.endsWith('.csv') || lowerName.endsWith('.txt') || !lowerName.includes('.')) {
+            if (lowerName.endsWith('.csv') || lowerName.endsWith('.txt') || lowerName.endsWith('.txtux') || !lowerName.includes('.')) {
                 try {
                     const text = await zipEntry.async("string");
                     if (text.trim().length > 0) {
@@ -65,7 +82,6 @@ async function processTextFile(file) {
                 globalPatients[data.id].score += data.score;
                 globalPatients[data.id].data = globalPatients[data.id].data.concat(data.data);
                 
-                // Sumar tiempo total acumulado
                 let t1 = parseInt(globalPatients[data.id].totalTime) || 0;
                 let t2 = parseInt(data.totalTime) || 0;
                 globalPatients[data.id].totalTime = `${t1 + t2} s`;
@@ -292,7 +308,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (uploadStatus) uploadStatus.textContent = "Procesando archivos...";
         hideError();
-        globalPatients = {};
+        
+        // Limpiar el estado anterior por completo antes de cargar el nuevo archivo
+        resetDashboard();
 
         try {
             for (const file of files) {
@@ -303,10 +321,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
             finishPatientLoading();
-            if (uploadStatus) uploadStatus.textContent = "¡Cargado com éxito!";
+            if (uploadStatus) uploadStatus.textContent = "¡Cargado con éxito!";
         } catch (err) {
             showError(`Error al procesar el archivo: ${err.message}`);
             if (uploadStatus) uploadStatus.textContent = "Error en la carga";
+        } finally {
+            // Limpiar el valor del input para permitir cargar otro archivo de inmediato
+            e.target.value = '';
         }
     });
 });
