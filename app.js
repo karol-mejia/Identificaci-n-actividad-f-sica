@@ -1,6 +1,7 @@
 let globalPatients = {};
 let activePatientId = null;
 let chartInstance = null;
+const BACKEND_URL = 'https://backend-acelerometria.onrender.com';
 
 function showError(message) {
     let errorDiv = document.getElementById('errorBanner');
@@ -9,10 +10,10 @@ function showError(message) {
     if (!errorDiv) {
         errorDiv = document.createElement('div');
         errorDiv.id = 'errorBanner';
-        errorDiv.style.cssText = 'background: #fee2e2; color: #b91c1c; padding: 15px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #fecaca; font-size: 14px; font-weight: bold;';
+        errorDiv.style.cssText = 'background: #fee2e2; color: #b91c1c; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #fecaca; font-size: 14px; font-weight: 500; line-height: 1.5;';
         container.insertBefore(errorDiv, container.firstChild);
     }
-    errorDiv.textContent = message;
+    errorDiv.innerHTML = `⚠️ <b>Error en la validación del archivo:</b> ${message}`;
     errorDiv.style.display = 'block';
 }
 
@@ -31,7 +32,7 @@ function resetDashboard() {
     }
     
     const patientList = document.getElementById('patientList');
-    if (patientList) patientList.innerHTML = '<p style="color: #6b7280; font-style: italic;">Cargando archivos...</p>';
+    if (patientList) patientList.innerHTML = '<p style="color: #6b7280; font-style: italic;">Cargando e inspeccionando estructura...</p>';
     
     const dash = document.getElementById('patientDashboardView');
     if (dash) dash.innerHTML = '';
@@ -61,7 +62,7 @@ async function processZip(file) {
         }
     }
     if (errors.length > 0) {
-        throw new Error(errors.join(" | "));
+        throw new Error(errors.join("<br>"));
     }
 }
 
@@ -69,18 +70,41 @@ async function processTextFile(file) {
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await fetch('https://backend-acelerometria.onrender.com/analizar', {
+    // 1. Paso de Inspección Previa
+    const inspectResponse = await fetch(`${BACKEND_URL}/inspeccionar`, {
         method: 'POST',
         body: formData
     });
     
-    const data = await response.json();
-    if (!response.ok) {
-        throw new Error(data.error || 'Error en el servidor al analizar el archivo.');
+    const inspectData = await inspectResponse.json();
+    if (!inspectResponse.ok) {
+        throw new Error(inspectData.error || `No se logró identificar la estructura del archivo ${file.name}`);
     }
-    
+
+    // 2. Paso de Análisis y Procesamiento Completo
+    const analyzeResponse = await fetch(`${BACKEND_URL}/analizar`, {
+        method: 'POST',
+        body: formData
+    });
+
+    const data = await analyzeResponse.json();
+    if (!analyzeResponse.ok) {
+        throw new Error(data.error || 'Error al procesar el archivo.');
+    }
+
     if (data && data.id) {
         if (globalPatients[data.id]) {
+            let previousMaxTime = 0;
+            if (globalPatients[data.id].data && globalPatients[data.id].data.length > 0) {
+                previousMaxTime = globalPatients[data.id].data[globalPatients[data.id].data.length - 1].time || 0;
+            }
+
+            if (previousMaxTime > 0 && data.data) {
+                data.data.forEach(row => {
+                    row.time = parseFloat((row.time + previousMaxTime).toFixed(1));
+                });
+            }
+
             globalPatients[data.id].totalRecords += data.totalRecords;
             globalPatients[data.id].score += data.score;
             globalPatients[data.id].data = globalPatients[data.id].data.concat(data.data);
@@ -109,24 +133,24 @@ async function processTextFile(file) {
                 });
             }
 
-            // Recalcular porcentajes globales y tiempo activo del paciente de forma precisa
             let totalSecs = parseInt(globalPatients[data.id].totalTime) || 1;
             let weightedSum = 0;
-            const weights = { 'Sentado en la cama': 0.3, 'Sentado en una silla': 0.5, 'Acostado': 0.1, 'Bípeda / Estática': 0.5, 'Deambulando': 1.0 };
+            const weights = { 'Sentado en la cama': 0.3, 'Sentado en una silla': 0.5, 'Acostado': 0.1, 'Deambulando': 1.0 };
             
             globalPatients[data.id].activityBreakdown.forEach(act => {
                 let actSecs = parseInt(act.time) || 0;
                 let pct = ((actSecs / totalSecs) * 100).toFixed(1);
                 act.percentage = `${pct}%`;
-                
                 let w = weights[act.activity] || 0.5;
                 weightedSum += actSecs * w;
             });
 
             globalPatients[data.id].activePercentage = parseFloat(((weightedSum / totalSecs) * 100).toFixed(1));
             globalPatients[data.id].badge = globalPatients[data.id].score > 1500 ? "Oro (Nivel Avanzado)" : (globalPatients[data.id].score > 800 ? "Plata (Nivel Intermedio)" : "Bronce (Nivel Iniciador)");
+            globalPatients[data.id].lastMeta = inspectData.meta;
         } else {
             globalPatients[data.id] = data;
+            globalPatients[data.id].lastMeta = inspectData.meta;
         }
     }
 }
@@ -195,16 +219,7 @@ function renderPatientDashboard(patient, rank, totalPatients) {
     }
 
     let rowsHtml = '';
-    let breakdown = patient.activityBreakdown;
-    
-    if (!breakdown || breakdown.length === 0) {
-        breakdown = [{
-            activity: "Actividad General",
-            time: patient.totalTime || "10 s",
-            percentage: `${patient.activePercentage || 100.0}%`,
-            points: `+${patient.score || 100} pts`
-        }];
-    }
+    let breakdown = patient.activityBreakdown || [];
 
     breakdown.forEach(row => {
         rowsHtml += `
@@ -217,7 +232,18 @@ function renderPatientDashboard(patient, rank, totalPatients) {
         `;
     });
 
+    const meta = patient.lastMeta || {};
+    const colsDet = meta.columnas_detectadas ? meta.columnas_detectadas.join(', ') : 'Automáticas';
+
     mainContainer.innerHTML = `
+        <!-- Vista previa de estructura identificada (Requisito #6) -->
+        <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 15px; margin-bottom: 20px; font-size: 13px; color: #1e40af;">
+            <div style="font-weight: bold; margin-bottom: 5px; font-size: 14px;">🔍 Estructura Identificada Automáticamente:</div>
+            <div>• <b>Filas Procesadas:</b> ${meta.total_filas_validas || patient.totalRecords} de ${meta.total_filas_originales || patient.totalRecords}</div>
+            <div>• <b>Encabezados / Columnas:</b> ${colsDet}</div>
+            <div>• <b>Separador detectado:</b> <code>${meta.separador_utilizado || 'Autodetectado'}</code></div>
+        </div>
+
         <h2 style="margin-top: 0; color: #1e293b; font-size: 22px;">Datos del Paciente: ${patient.id}</h2>
         <div style="font-size: 14px; color: #475569; margin-bottom: 20px; display: flex; gap: 30px; flex-wrap: wrap;">
             <div>Género: <b>${patient.gender}</b></div>
@@ -267,8 +293,7 @@ function drawChart(records) {
             'Sentado en la cama': 1, 
             'Sentado en una silla': 2, 
             'Acostado': 3, 
-            'Deambulando': 4,
-            'Bípeda / Estática': 2
+            'Deambulando': 4
         };
         const targetCode = valMap[selectFilter.value];
         if (targetCode) {
@@ -309,7 +334,7 @@ function drawChart(records) {
             responsive: true,
             maintainAspectRatio: false,
             scales: {
-                x: { title: { display: true, text: 'Tiempo (s)' } },
+                x: { title: { display: true, text: 'Tiempo Total Acumulado (s)' } },
                 y: { title: { display: true, text: 'Aceleración (G)' } }
             }
         }
@@ -326,9 +351,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const files = Array.from(e.target.files);
         if (files.length === 0) return;
 
-        if (uploadStatus) uploadStatus.textContent = "Procesando archivos...";
+        if (uploadStatus) uploadStatus.textContent = "Inspeccionando y procesando...";
         hideError();
-        
         resetDashboard();
 
         try {
@@ -340,10 +364,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
             finishPatientLoading();
-            if (uploadStatus) uploadStatus.textContent = "¡Cargado con éxito!";
+            if (uploadStatus) uploadStatus.textContent = "¡Estructura validada y cargada!";
         } catch (err) {
-            showError(`Error al procesar: ${err.message}`);
-            if (uploadStatus) uploadStatus.textContent = "Error en la carga";
+            showError(err.message);
+            if (uploadStatus) uploadStatus.textContent = "Error en la estructura del archivo";
         } finally {
             e.target.value = '';
         }
