@@ -1,0 +1,42 @@
+{
+  "id": "Readme",
+  "gender": "Masculino",
+  "totalRecords": 2,
+  "totalTime": "1 s",
+  "score": 10,
+  "badge": "Bronce (Nivel Iniciador)",
+  "activePercentage": 100.0,
+  "motivationMessage": "¡Gran trabajo! Tus datos reales de acelerometría se han procesado correctamente.",
+  "activityBreakdown": [
+    {
+      "activity": "Sentado en la cama",
+      "time": "1 s",
+      "percentage": "100.0%",
+      "points": "+5 pts",
+      "code": 1
+    },
+    {
+      "activity": "Sentado en la cama",
+      "time": "1 s",
+      "percentage": "100.0%",
+      "points": "+5 pts",
+      "code": 1
+    }
+  ],
+  "data": [
+    {
+      "time": 0.0,
+      "accFrontal": 8.0,
+      "accVertical": 8.0,
+      "accLateral": 8.0,
+      "activityCode": 1
+    },
+    {
+      "time": 0.0,
+      "accFrontal": 8.0,
+      "accVertical": 8.0,
+      "accLateral": 8.0,
+      "activityCode": 1
+    }
+  ]
+}
