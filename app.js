@@ -10,7 +10,7 @@ function showError(message) {
     if (!errorDiv) {
         errorDiv = document.createElement('div');
         errorDiv.id = 'errorBanner';
-        errorDiv.style.cssText = 'background: #fee2e2; color: #b91c1c; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #fecaca; font-size: 14px; font-weight: 500; line-height: 1.5;';
+        errorDiv.style.cssText = 'background: #fee2e2; color: #b91c1c; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #fecaca; font-size: 14px; font-weight: 500;';
         container.insertBefore(errorDiv, container.firstChild);
     }
     errorDiv.innerHTML = `⚠️ <b>Aviso:</b> ${message}`;
@@ -32,7 +32,7 @@ function resetDashboard() {
     }
     
     const patientList = document.getElementById('patientList');
-    if (patientList) patientList.innerHTML = '<p style="color: #6b7280; font-style: italic;">Cargando e inspeccionando archivos...</p>';
+    if (patientList) patientList.innerHTML = '<p style="color: #6b7280; font-style: italic;">Cargando archivos del ZIP...</p>';
     
     const dash = document.getElementById('patientDashboardView');
     if (dash) dash.innerHTML = '';
@@ -52,7 +52,7 @@ async function processZip(file) {
         const filename = relativePath.split('/').pop();
         if (filename && !filename.startsWith('.') && !filename.toLowerCase().includes('readme')) {
             const lowerName = filename.toLowerCase();
-            if (lowerName.endsWith('.csv') || lowerName.endsWith('.txt') || lowerName.endsWith('.txtux') || !lowerName.includes('.')) {
+            if (lowerName.endsWith('.csv') || lowerName.endsWith('.txt') || lowerName.endsWith('.txtux') || lowerName.endsWith('.json') || !lowerName.includes('.')) {
                 try {
                     const arrayBuffer = await zipEntry.async("arraybuffer");
                     const blob = new Blob([arrayBuffer]);
@@ -73,23 +73,20 @@ async function processTextFile(file) {
     const formData = new FormData();
     formData.append('file', file);
 
-    const inspectResponse = await fetch(`${BACKEND_URL}/inspeccionar`, {
+    const response = await fetch(`${BACKEND_URL}/analizar`, {
         method: 'POST',
         body: formData
     });
-    
-    const inspectData = await inspectResponse.json();
-    if (!inspectResponse.ok) {
-        throw new Error(inspectData.error || `No se logró identificar la estructura del archivo ${file.name}`);
+
+    const textRes = await response.text();
+    let data;
+    try {
+        data = JSON.parse(textRes);
+    } catch (err) {
+        throw new Error(`Error en servidor (${response.status}): ${textRes.substring(0, 100)}`);
     }
 
-    const analyzeResponse = await fetch(`${BACKEND_URL}/analizar`, {
-        method: 'POST',
-        body: formData
-    });
-
-    const data = await analyzeResponse.json();
-    if (!analyzeResponse.ok) {
+    if (!response.ok) {
         throw new Error(data.error || 'Error al procesar el archivo.');
     }
 
@@ -124,34 +121,13 @@ async function processTextFile(file) {
                         let et1 = parseInt(existing.time) || 0;
                         let et2 = parseInt(newAct.time) || 0;
                         existing.time = `${et1 + et2} s`;
-
-                        let ep1 = parseInt(existing.points.replace('+', '').replace(' pts', '')) || 0;
-                        let ep2 = parseInt(newAct.points.replace('+', '').replace(' pts', '')) || 0;
-                        existing.points = `+${ep1 + ep2} pts`;
                     } else {
                         globalPatients[data.id].activityBreakdown.push(newAct);
                     }
                 });
             }
-
-            let totalSecs = parseInt(globalPatients[data.id].totalTime) || 1;
-            let weightedSum = 0;
-            const weights = { 'Sentado en la cama': 0.3, 'Sentado en una silla': 0.5, 'Acostado': 0.1, 'Deambulando': 1.0 };
-            
-            globalPatients[data.id].activityBreakdown.forEach(act => {
-                let actSecs = parseInt(act.time) || 0;
-                let pct = ((actSecs / totalSecs) * 100).toFixed(1);
-                act.percentage = `${pct}%`;
-                let w = weights[act.activity] || 0.5;
-                weightedSum += actSecs * w;
-            });
-
-            globalPatients[data.id].activePercentage = parseFloat(((weightedSum / totalSecs) * 100).toFixed(1));
-            globalPatients[data.id].badge = globalPatients[data.id].score > 1500 ? "Oro (Nivel Avanzado)" : (globalPatients[data.id].score > 800 ? "Plata (Nivel Intermedio)" : "Bronce (Nivel Iniciador)");
-            globalPatients[data.id].lastMeta = inspectData.meta;
         } else {
             globalPatients[data.id] = data;
-            globalPatients[data.id].lastMeta = inspectData.meta;
         }
     }
 }
@@ -233,15 +209,13 @@ function renderPatientDashboard(patient, rank, totalPatients) {
         `;
     });
 
-    const meta = patient.lastMeta || {};
-    const colsDet = meta.columnas_detectadas ? meta.columnas_detectadas.join(', ') : 'Automáticas';
+    const rfStatus = patient.randomForestMetrics && patient.randomForestMetrics.status ? patient.randomForestMetrics.status : 'Modelo Activo';
 
     mainContainer.innerHTML = `
-        <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 15px; margin-bottom: 20px; font-size: 13px; color: #1e40af;">
-            <div style="font-weight: bold; margin-bottom: 5px; font-size: 14px;">🔍 Estructura Identificada Automáticamente:</div>
-            <div>• <b>Registros Totales:</b> ${meta.total_filas_validas || patient.totalRecords}</div>
-            <div>• <b>Columnas Detectadas:</b> ${colsDet}</div>
-            <div>• <b>Separador:</b> <code>${meta.separador_utilizado || 'Autodetectado'}</code></div>
+        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 15px; margin-bottom: 20px; font-size: 13px; color: #166534;">
+            <div style="font-weight: bold; margin-bottom: 5px; font-size: 14px;">🤖 Estado del Modelo Random Forest:</div>
+            <div>• <b>Estado:</b> ${rfStatus}</div>
+            <div>• <b>Columnas Procesadas:</b> Columnas 1, 2, 3, 4 y 9 verificadas.</div>
         </div>
 
         <h2 style="margin-top: 0; color: #1e293b; font-size: 22px;">Datos del Paciente: ${patient.id}</h2>
@@ -268,14 +242,14 @@ function renderPatientDashboard(patient, rank, totalPatients) {
             </table>
         </div>
 
-        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #10b981; padding: 20px; border-radius: 8px;">
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #10b981; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
             <div style="display: flex; align-items: center; gap: 8px; font-weight: bold; color: #1e293b; font-size: 16px; margin-bottom: 10px;">
-                🏆 Sistema de Recompensas
+                🏆 Sistema de Recompensas y Motivación
             </div>
             <div style="font-size: 14px; color: #334155; line-height: 1.6;">
-                Puntaje de Actividad: <b style="color: #16a34a;">${patient.score} Puntos</b> | Posición: <b>#${rank} de ${totalPatients}</b><br>
-                Insignia Obtenida: 🏅 <b>${patient.badge}</b><br>
-                Tiempo en Movimiento: <b>${patient.activePercentage}% del total</b>
+                Puntaje Total: <b style="color: #16a34a;">${patient.score} Puntos</b> | Posición: <b>#${rank} de ${totalPatients}</b><br>
+                Insignia: 🏅 <b>${patient.badge}</b><br>
+                💬 <b>Mensaje de Motivación:</b> <i>"${patient.motivationMessage || '¡Sigue esforzándote!'}"</i>
             </div>
         </div>
     `;
@@ -294,7 +268,7 @@ function updateVisualizationsAndTable(records) {
                 'Sentado en la cama': 1, 
                 'Sentado en una silla': 2, 
                 'Acostado': 3, 
-                'Deambulando': 4
+                'Deambulando': 4 
             };
             const targetCode = valMap[selectedActivityName];
             if (targetCode !== undefined) {
@@ -326,16 +300,15 @@ function drawChart(records, activityName) {
     }
 
     if (!records || records.length === 0) {
-        // Manejo de actividad sin registros (Requisito importante)
         const parent = ctx.parentNode;
         let warningBox = document.getElementById('noDataChartMsg');
         if (!warningBox) {
             warningBox = document.createElement('div');
             warningBox.id = 'noDataChartMsg';
-            warningBox.style.cssText = 'padding: 40px; text-align: center; color: #6b7280; font-style: italic; background: #f9fafb; border-radius: 8px; margin-top: 10px;';
+            warningBox.style.cssText = 'padding: 40px; text-align: center; color: #b91c1c; font-style: italic; background: #fee2e2; border-radius: 8px; margin-top: 10px; font-size: 14px;';
             parent.appendChild(warningBox);
         }
-        warningBox.textContent = `No hay datos disponibles para la actividad "${activityName}" en este archivo.`;
+        warningBox.textContent = `⚠️ No hay datos disponibles para la actividad "${activityName}" en los registros de este archivo.`;
         ctx.style.display = 'none';
         return;
     } else {
@@ -357,16 +330,16 @@ function drawChart(records, activityName) {
         data: {
             labels: labels,
             datasets: [
-                { label: 'Acel. Frontal (G)', data: frontal, borderColor: '#3b82f6', borderWidth: 1.5, pointRadius: 0 },
-                { label: 'Acel. Vertical (G)', data: vertical, borderColor: '#10b981', borderWidth: 1.5, pointRadius: 0 },
-                { label: 'Acel. Lateral (G)', data: lateral, borderColor: '#f59e0b', borderWidth: 1.5, pointRadius: 0 }
+                { label: 'Acel. Frontal (Col. 2)', data: frontal, borderColor: '#3b82f6', borderWidth: 1.5, pointRadius: 0 },
+                { label: 'Acel. Vertical (Col. 3)', data: vertical, borderColor: '#10b981', borderWidth: 1.5, pointRadius: 0 },
+                { label: 'Acel. Lateral (Col. 4)', data: lateral, borderColor: '#f59e0b', borderWidth: 1.5, pointRadius: 0 }
             ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             scales: {
-                x: { title: { display: true, text: 'Tiempo (s)' } },
+                x: { title: { display: true, text: 'Tiempo (Columna 1 - s)' } },
                 y: { title: { display: true, text: 'Aceleración (G)' } }
             }
         }
@@ -386,19 +359,22 @@ function renderActivityDataTable(records, activityName) {
 
     if (!records || records.length === 0) {
         dataTableContainer.innerHTML = `
-            <h3 style="color: #1e293b; font-size: 18px; margin-top: 0;">Registros Reales: ${activityName}</h3>
+            <h3 style="color: #1e293b; font-size: 18px; margin-top: 0;">Registros de la Actividad: ${activityName}</h3>
             <div style="padding: 20px; text-align: center; color: #b91c1c; background: #fee2e2; border-radius: 6px; font-size: 14px;">
-                ⚠️ No hay datos disponibles para la actividad seleccionada en el archivo cargado.
+                ⚠️ No hay registros reales disponibles para esta actividad.
             </div>
         `;
         return;
     }
 
-    // Limitar vista previa a las primeras 100 filas para fluidez en el DOM, indicando el total real
     const displayRows = records.slice(0, 100);
     let rowsHtml = '';
-
-    const activityLabelsMap = { 1: 'Sentado en la cama', 2: 'Sentado en una silla', 3: 'Acostado', 4: 'Deambulando' };
+    const activityLabelsMap = { 
+        1: 'Sentado en la cama', 
+        2: 'Sentado en una silla', 
+        3: 'Acostado', 
+        4: 'Deambulando' 
+    };
 
     displayRows.forEach(r => {
         let actText = activityLabelsMap[r.activityCode] || `Código ${r.activityCode}`;
@@ -414,19 +390,19 @@ function renderActivityDataTable(records, activityName) {
     });
 
     dataTableContainer.innerHTML = `
-        <h3 style="color: #1e293b; font-size: 18px; margin-top: 0;">Registros Reales de la Actividad: ${activityName}</h3>
+        <h3 style="color: #1e293b; font-size: 18px; margin-top: 0;">Registros Reales: ${activityName}</h3>
         <p style="font-size: 13px; color: #64748b; margin-bottom: 15px;">
-            Mostrando <b>${displayRows.length}</b> de <b>${records.length}</b> registros reales extraídos del archivo.
+            Mostrando <b>${displayRows.length}</b> de <b>${records.length}</b> registros reales (Columnas 1, 2, 3, 4 y 9).
         </p>
         <div style="overflow-x: auto; max-height: 350px;">
             <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
                 <thead>
                     <tr style="border-bottom: 2px solid #e2e8f0; color: #64748b; background: #f8fafc; position: sticky; top: 0;">
-                        <th style="padding: 10px;">Tiempo</th>
-                        <th style="padding: 10px;">Acel. Frontal</th>
-                        <th style="padding: 10px;">Acel. Vertical</th>
-                        <th style="padding: 10px;">Acel. Lateral</th>
-                        <th style="padding: 10px;">Actividad Identificada</th>
+                        <th style="padding: 10px;">Tiempo (Col. 1)</th>
+                        <th style="padding: 10px;">Acel. Frontal (Col. 2)</th>
+                        <th style="padding: 10px;">Acel. Vertical (Col. 3)</th>
+                        <th style="padding: 10px;">Acel. Lateral (Col. 4)</th>
+                        <th style="padding: 10px;">Actividad (Col. 9)</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -447,7 +423,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const files = Array.from(e.target.files);
         if (files.length === 0) return;
 
-        if (uploadStatus) uploadStatus.textContent = "Procesando datos reales...";
+        if (uploadStatus) uploadStatus.textContent = "Procesando datos reales y modelo RF...";
         hideError();
         resetDashboard();
 
@@ -460,10 +436,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
             finishPatientLoading();
-            if (uploadStatus) uploadStatus.textContent = "¡Datos reales cargados!";
+            if (uploadStatus) uploadStatus.textContent = "¡Procesamiento completado con éxito!";
         } catch (err) {
             showError(err.message);
-            if (uploadStatus) uploadStatus.textContent = "Error en la lectura";
+            if (uploadStatus) uploadStatus.textContent = "Error en el procesamiento";
         } finally {
             e.target.value = '';
         }
