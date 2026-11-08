@@ -5,7 +5,6 @@ import glob
 import pandas as pd
 
 def decodificar_texto(file_bytes):
-    """Decodifica el archivo probando UTF-16, UTF-8 y Latin-1."""
     encodings = ['utf-16', 'utf-16le', 'utf-16be', 'utf-8', 'latin-1', 'cp1252']
     for enc in encodings:
         try:
@@ -24,7 +23,6 @@ def procesar_archivo_a_json(filepath):
     clean_filename = os.path.splitext(filename)[0]
     b_lower = filename.lower()
 
-    # 1. Determinar Actividad según el nombre del archivo
     if 'acostada' in b_lower:
         activity_code = 3
         act_name = 'Acostado'
@@ -41,16 +39,18 @@ def procesar_archivo_a_json(filepath):
         activity_code = 1
         act_name = 'Sentado en la cama'
 
-    # 2. Determinar Identificador del Paciente (ej. d1p01M -> Paciente D1P01M)
     words = re.split(r'[_\s-]+', clean_filename)
     clean_words = [w.strip() for w in words if w.lower() not in ['sentada', 'bipeda', 'bípeda', 'marcha', 'acostada', 'caminar', 'datos'] and not w.isdigit()]
     patient_id = " ".join(clean_words).strip().title()
     if not patient_id:
         patient_id = f"Paciente {clean_filename.upper()}"
 
-    # 3. Leer y extraer columnas numéricas de forma flexible
-    with open(filepath, 'rb') as f:
-        file_bytes = f.read()
+    try:
+        with open(filepath, 'rb') as f:
+            file_bytes = f.read()
+    except Exception as e:
+        print(f"❌ No se pudo abrir {filename}: {e}")
+        return None
 
     text_data = decodificar_texto(file_bytes)
     lines = text_data.splitlines()
@@ -64,7 +64,6 @@ def procesar_archivo_a_json(filepath):
         normalized = line_str.replace(',', '.')
         nums = re.findall(r'[-+]?\d*\.?\d+', normalized)
         
-        # Con que tenga al menos 2 números (Tiempo y al menos un eje) se acepta
         if len(nums) >= 2:
             try:
                 t_val = float(nums[0])
@@ -72,7 +71,6 @@ def procesar_archivo_a_json(filepath):
                 ay = float(nums[2]) if len(nums) > 2 else ax
                 az = float(nums[3]) if len(nums) > 3 else ax
                 
-                # Si viene etiqueta de actividad en columna 9 (índice 8)
                 code_to_use = activity_code
                 if len(nums) >= 9:
                     try:
@@ -91,13 +89,11 @@ def procesar_archivo_a_json(filepath):
                 continue
 
     if not data_rows:
-        print(f"❌ Omitido: {filename} (sin filas numéricas válidas)")
         return None
 
     df = pd.DataFrame(data_rows)
     total_records = len(df)
     
-    # Normalización del tiempo
     t_min = df['time'].min()
     t_max = df['time'].max()
     raw_duration = t_max - t_min
@@ -142,9 +138,13 @@ def convertir_carpeta():
     output_dir = "json_convertidos"
     os.makedirs(output_dir, exist_ok=True)
     
-    # Buscar todos los archivos en el directorio actual
-    archivos = glob.glob("*.txt") + glob.glob("*.txtux") + glob.glob("*.csv") + glob.glob("*.dat")
-    print(f"📦 Procesando {len(archivos)} archivos...")
+    # Búsqueda recursiva en todas las subcarpetas (S1_Dataset, S2_Dataset, etc.)
+    extensiones = ['*.txt', '*.txtux', '*.csv', '*.dat']
+    archivos = []
+    for ext in extensiones:
+        archivos.extend(glob.glob(f"**/{ext}", recursive=True))
+    
+    print(f"📦 Encontrados {len(archivos)} archivos en total dentro de las subcarpetas...")
 
     pacientes_unificados = {}
 
@@ -167,11 +167,12 @@ def convertir_carpeta():
 
     for pid, pdata in pacientes_unificados.items():
         filename_json = f"{re.sub(r'[^a-zA-Z0-9_]', '_', pid)}.json"
-        with open(os.path.join(output_dir, filename_json), 'w', encoding='utf-8') as out:
+        ruta_salida = os.path.join(output_dir, filename_json)
+        with open(ruta_salida, 'w', encoding='utf-8') as out:
             json.dump(pdata, out, ensure_ascii=False, indent=2)
         print(f"✅ Generado: {filename_json}")
 
-    print(f"\n🎉 ¡Finalizado! Los archivos JSON estructurados están en la carpeta '{output_dir}'.")
+    print(f"\n🎉 ¡Proceso terminado! La carpeta '{output_dir}' ya ha sido creada con los archivos JSON.")
 
 if __name__ == "__main__":
     convertir_carpeta()
