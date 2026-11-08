@@ -9,8 +9,8 @@ function showError(message) {
     if (!errorDiv) {
         errorDiv = document.createElement('div');
         errorDiv.id = 'errorBanner';
-        errorDiv.style.cssText = 'background: #fee2e2; color: #b91c1c; padding: 12px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #fecaca; font-size: 14px;';
-        container.appendChild(errorDiv);
+        errorDiv.style.cssText = 'background: #fee2e2; color: #b91c1c; padding: 15px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #fecaca; font-size: 14px; font-weight: bold;';
+        container.insertBefore(errorDiv, container.firstChild);
     }
     errorDiv.textContent = message;
     errorDiv.style.display = 'block';
@@ -21,7 +21,6 @@ function hideError() {
     if (errorDiv) errorDiv.style.display = 'none';
 }
 
-// Función para limpiar completamente el estado anterior antes de una nueva carga
 function resetDashboard() {
     globalPatients = {};
     activePatientId = null;
@@ -32,7 +31,7 @@ function resetDashboard() {
     }
     
     const patientList = document.getElementById('patientList');
-    if (patientList) patientList.innerHTML = '';
+    if (patientList) patientList.innerHTML = '<p style="color: #6b7280; font-style: italic;">Cargando archivos...</p>';
     
     const dash = document.getElementById('patientDashboardView');
     if (dash) dash.innerHTML = '';
@@ -43,6 +42,7 @@ async function processZip(file) {
     const zip = new JSZip();
     const contents = await zip.loadAsync(file);
     
+    let errors = [];
     for (const [relativePath, zipEntry] of Object.entries(contents.files)) {
         if (zipEntry.dir || relativePath.includes('MACOSX') || relativePath.startsWith('.')) continue;
         const filename = relativePath.split('/').pop();
@@ -57,10 +57,13 @@ async function processZip(file) {
                         await processTextFile(extractedFile);
                     }
                 } catch (e) {
-                    console.warn(`Error leyendo ${filename}:`, e);
+                    errors.push(`${filename}: ${e.message}`);
                 }
             }
         }
+    }
+    if (errors.length > 0) {
+        throw new Error(errors.join(" | "));
     }
 }
 
@@ -68,49 +71,48 @@ async function processTextFile(file) {
     const formData = new FormData();
     formData.append('file', file);
 
-    try {
-        const response = await fetch('https://backend-acelerometria.onrender.com/analizar', {
-            method: 'POST',
-            body: formData
-        });
-        if (!response.ok) throw new Error('Error en el servidor');
-        const data = await response.json();
-        
-        if (data && data.id) {
-            if (globalPatients[data.id]) {
-                globalPatients[data.id].totalRecords += data.totalRecords;
-                globalPatients[data.id].score += data.score;
-                globalPatients[data.id].data = globalPatients[data.id].data.concat(data.data);
-                
-                let t1 = parseInt(globalPatients[data.id].totalTime) || 0;
-                let t2 = parseInt(data.totalTime) || 0;
-                globalPatients[data.id].totalTime = `${t1 + t2} s`;
+    const response = await fetch('https://backend-acelerometria.onrender.com/analizar', {
+        method: 'POST',
+        body: formData
+    });
+    
+    const data = await response.json();
+    if (!response.ok) {
+        throw new Error(data.error || 'Error en el servidor al analizar el archivo.');
+    }
+    
+    if (data && data.id) {
+        if (globalPatients[data.id]) {
+            globalPatients[data.id].totalRecords += data.totalRecords;
+            globalPatients[data.id].score += data.score;
+            globalPatients[data.id].data = globalPatients[data.id].data.concat(data.data);
+            
+            let t1 = parseInt(globalPatients[data.id].totalTime) || 0;
+            let t2 = parseInt(data.totalTime) || 0;
+            globalPatients[data.id].totalTime = `${t1 + t2} s`;
 
-                if (data.activityBreakdown) {
-                    if (!globalPatients[data.id].activityBreakdown) {
-                        globalPatients[data.id].activityBreakdown = [];
-                    }
-                    data.activityBreakdown.forEach(newAct => {
-                        let existing = globalPatients[data.id].activityBreakdown.find(a => a.activity === newAct.activity);
-                        if (existing) {
-                            let et1 = parseInt(existing.time) || 0;
-                            let et2 = parseInt(newAct.time) || 0;
-                            existing.time = `${et1 + et2} s`;
-
-                            let ep1 = parseInt(existing.points.replace('+', '').replace(' pts', '')) || 0;
-                            let ep2 = parseInt(newAct.points.replace('+', '').replace(' pts', '')) || 0;
-                            existing.points = `+${ep1 + ep2} pts`;
-                        } else {
-                            globalPatients[data.id].activityBreakdown.push(newAct);
-                        }
-                    });
+            if (data.activityBreakdown) {
+                if (!globalPatients[data.id].activityBreakdown) {
+                    globalPatients[data.id].activityBreakdown = [];
                 }
-            } else {
-                globalPatients[data.id] = data;
+                data.activityBreakdown.forEach(newAct => {
+                    let existing = globalPatients[data.id].activityBreakdown.find(a => a.activity === newAct.activity);
+                    if (existing) {
+                        let et1 = parseInt(existing.time) || 0;
+                        let et2 = parseInt(newAct.time) || 0;
+                        existing.time = `${et1 + et2} s`;
+
+                        let ep1 = parseInt(existing.points.replace('+', '').replace(' pts', '')) || 0;
+                        let ep2 = parseInt(newAct.points.replace('+', '').replace(' pts', '')) || 0;
+                        existing.points = `+${ep1 + ep2} pts`;
+                    } else {
+                        globalPatients[data.id].activityBreakdown.push(newAct);
+                    }
+                });
             }
+        } else {
+            globalPatients[data.id] = data;
         }
-    } catch (err) {
-        console.warn('Archivo omitido:', err);
     }
 }
 
@@ -158,21 +160,23 @@ function finishPatientLoading() {
     if (patientIds.length > 0) {
         activePatientId = patientIds[0];
         const firstItem = patientList.firstChild;
-        if (firstItem) firstItem.style.borderColor = '#3b82f6';
-        renderPatientDashboard(globalPatients[activePatientId], 1, patientIds.length);
-        drawChart(globalPatients[activePatientId].data);
+        if (firstItem) {
+            firstItem.style.borderColor = '#3b82f6';
+            renderPatientDashboard(globalPatients[activePatientId], 1, patientIds.length);
+            drawChart(globalPatients[activePatientId].data);
+        }
     }
 }
 
 function renderPatientDashboard(patient, rank, totalPatients) {
-    const mainContainer = document.querySelector('.main-container') || document.body;
-    let dash = document.getElementById('patientDashboardView');
-
-    if (!dash) {
-        dash = document.createElement('div');
-        dash.id = 'patientDashboardView';
-        dash.style.cssText = 'background: white; border-radius: 10px; padding: 25px; border: 1px solid #e5e7eb; margin-top: 20px;';
-        mainContainer.appendChild(dash);
+    let mainContainer = document.getElementById('patientDashboardView');
+    
+    if (!mainContainer) {
+        mainContainer = document.createElement('div');
+        mainContainer.id = 'patientDashboardView';
+        mainContainer.style.cssText = 'background: white; border-radius: 10px; padding: 25px; border: 1px solid #e5e7eb; margin-top: 20px;';
+        const targetParent = document.querySelector('.main-container') || document.body;
+        targetParent.appendChild(mainContainer);
     }
 
     let rowsHtml = '';
@@ -198,7 +202,7 @@ function renderPatientDashboard(patient, rank, totalPatients) {
         `;
     });
 
-    dash.innerHTML = `
+    mainContainer.innerHTML = `
         <h2 style="margin-top: 0; color: #1e293b; font-size: 22px;">Datos del Paciente: ${patient.id}</h2>
         <div style="font-size: 14px; color: #475569; margin-bottom: 20px; display: flex; gap: 30px; flex-wrap: wrap;">
             <div>Género: <b>${patient.gender}</b></div>
@@ -309,7 +313,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (uploadStatus) uploadStatus.textContent = "Procesando archivos...";
         hideError();
         
-        // Limpiar el estado anterior por completo antes de cargar el nuevo archivo
         resetDashboard();
 
         try {
@@ -323,10 +326,9 @@ document.addEventListener('DOMContentLoaded', () => {
             finishPatientLoading();
             if (uploadStatus) uploadStatus.textContent = "¡Cargado con éxito!";
         } catch (err) {
-            showError(`Error al procesar el archivo: ${err.message}`);
+            showError(`Error al procesar: ${err.message}`);
             if (uploadStatus) uploadStatus.textContent = "Error en la carga";
         } finally {
-            // Limpiar el valor del input para permitir cargar otro archivo de inmediato
             e.target.value = '';
         }
     });
