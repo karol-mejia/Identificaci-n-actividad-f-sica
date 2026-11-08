@@ -50,12 +50,10 @@ async function processZip(file) {
             const lowerName = filename.toLowerCase();
             if (lowerName.endsWith('.csv') || lowerName.endsWith('.txt') || lowerName.endsWith('.txtux') || !lowerName.includes('.')) {
                 try {
-                    const text = await zipEntry.async("string");
-                    if (text.trim().length > 0) {
-                        const blob = new Blob([text], { type: 'text/plain' });
-                        const extractedFile = new File([blob], filename, { type: 'text/plain' });
-                        await processTextFile(extractedFile);
-                    }
+                    const arrayBuffer = await zipEntry.async("arraybuffer");
+                    const blob = new Blob([arrayBuffer]);
+                    const extractedFile = new File([blob], filename);
+                    await processTextFile(extractedFile);
                 } catch (e) {
                     errors.push(`${filename}: ${e.message}`);
                 }
@@ -110,6 +108,23 @@ async function processTextFile(file) {
                     }
                 });
             }
+
+            // Recalcular porcentajes globales y tiempo activo del paciente de forma precisa
+            let totalSecs = parseInt(globalPatients[data.id].totalTime) || 1;
+            let weightedSum = 0;
+            const weights = { 'Sentado en la cama': 0.3, 'Sentado en una silla': 0.5, 'Acostado': 0.1, 'Bípeda / Estática': 0.5, 'Deambulando': 1.0 };
+            
+            globalPatients[data.id].activityBreakdown.forEach(act => {
+                let actSecs = parseInt(act.time) || 0;
+                let pct = ((actSecs / totalSecs) * 100).toFixed(1);
+                act.percentage = `${pct}%`;
+                
+                let w = weights[act.activity] || 0.5;
+                weightedSum += actSecs * w;
+            });
+
+            globalPatients[data.id].activePercentage = parseFloat(((weightedSum / totalSecs) * 100).toFixed(1));
+            globalPatients[data.id].badge = globalPatients[data.id].score > 1500 ? "Oro (Nivel Avanzado)" : (globalPatients[data.id].score > 800 ? "Plata (Nivel Intermedio)" : "Bronce (Nivel Iniciador)");
         } else {
             globalPatients[data.id] = data;
         }
@@ -252,7 +267,8 @@ function drawChart(records) {
             'Sentado en la cama': 1, 
             'Sentado en una silla': 2, 
             'Acostado': 3, 
-            'Deambulando': 4 
+            'Deambulando': 4,
+            'Bípeda / Estática': 2
         };
         const targetCode = valMap[selectFilter.value];
         if (targetCode) {
