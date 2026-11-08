@@ -1,7 +1,6 @@
 let globalPatients = {};
 let activePatientId = null;
 let chartInstance = null;
-const BACKEND_URL = 'https://backend-acelerometria.onrender.com';
 
 function showError(message) {
     let errorDiv = document.getElementById('errorBanner');
@@ -32,7 +31,7 @@ function resetDashboard() {
     }
     
     const patientList = document.getElementById('patientList');
-    if (patientList) patientList.innerHTML = '<p style="color: #6b7280; font-style: italic;">Cargando archivos del ZIP...</p>';
+    if (patientList) patientList.innerHTML = '<p style="color: #6b7280; font-style: italic;">Cargando archivos JSON...</p>';
     
     const dash = document.getElementById('patientDashboardView');
     if (dash) dash.innerHTML = '';
@@ -41,93 +40,37 @@ function resetDashboard() {
     if (dataTableContainer) dataTableContainer.innerHTML = '';
 }
 
+async function processJsonFile(file) {
+    const text = await file.text();
+    const data = JSON.parse(text);
+
+    if (!data.id || !data.data) {
+        throw new Error(`El archivo ${file.name} no contiene la estructura JSON esperada.`);
+    }
+
+    if (globalPatients[data.id]) {
+        globalPatients[data.id].totalRecords += data.totalRecords;
+        globalPatients[data.id].score += data.score;
+        globalPatients[data.id].data = globalPatients[data.id].data.concat(data.data);
+    } else {
+        globalPatients[data.id] = data;
+    }
+}
+
 async function processZip(file) {
     if (typeof JSZip === 'undefined') throw new Error("JSZip no está cargado.");
     const zip = new JSZip();
     const contents = await zip.loadAsync(file);
     
-    let errors = [];
     for (const [relativePath, zipEntry] of Object.entries(contents.files)) {
         if (zipEntry.dir || relativePath.includes('MACOSX') || relativePath.startsWith('.')) continue;
         const filename = relativePath.split('/').pop();
-        if (filename && !filename.startsWith('.') && !filename.toLowerCase().includes('readme')) {
-            const lowerName = filename.toLowerCase();
-            if (lowerName.endsWith('.csv') || lowerName.endsWith('.txt') || lowerName.endsWith('.txtux') || lowerName.endsWith('.json') || !lowerName.includes('.')) {
-                try {
-                    const arrayBuffer = await zipEntry.async("arraybuffer");
-                    const blob = new Blob([arrayBuffer]);
-                    const extractedFile = new File([blob], filename);
-                    await processTextFile(extractedFile);
-                } catch (e) {
-                    errors.push(`${filename}: ${e.message}`);
-                }
+        if (filename && filename.toLowerCase().endsWith('.json')) {
+            const text = await zipEntry.async("string");
+            const data = JSON.parse(text);
+            if (data.id && data.data) {
+                globalPatients[data.id] = data;
             }
-        }
-    }
-    if (errors.length > 0) {
-        throw new Error(errors.join("<br>"));
-    }
-}
-
-async function processTextFile(file) {
-    const formData = new FormData();
-    formData.append('file', file);
-
-    const response = await fetch(`${BACKEND_URL}/analizar`, {
-        method: 'POST',
-        body: formData
-    });
-
-    const textRes = await response.text();
-    let data;
-    try {
-        data = JSON.parse(textRes);
-    } catch (err) {
-        throw new Error(`Error en servidor (${response.status}): ${textRes.substring(0, 100)}`);
-    }
-
-    if (!response.ok) {
-        throw new Error(data.error || 'Error al procesar el archivo.');
-    }
-
-    if (data && data.id) {
-        if (globalPatients[data.id]) {
-            let previousMaxTime = 0;
-            if (globalPatients[data.id].data && globalPatients[data.id].data.length > 0) {
-                previousMaxTime = globalPatients[data.id].data[globalPatients[data.id].data.length - 1].time || 0;
-            }
-
-            if (previousMaxTime > 0 && data.data) {
-                data.data.forEach(row => {
-                    row.time = parseFloat((row.time + previousMaxTime).toFixed(1));
-                });
-            }
-
-            globalPatients[data.id].totalRecords += data.totalRecords;
-            globalPatients[data.id].score += data.score;
-            globalPatients[data.id].data = globalPatients[data.id].data.concat(data.data);
-            
-            let t1 = parseInt(globalPatients[data.id].totalTime) || 0;
-            let t2 = parseInt(data.totalTime) || 0;
-            globalPatients[data.id].totalTime = `${t1 + t2} s`;
-
-            if (data.activityBreakdown) {
-                if (!globalPatients[data.id].activityBreakdown) {
-                    globalPatients[data.id].activityBreakdown = [];
-                }
-                data.activityBreakdown.forEach(newAct => {
-                    let existing = globalPatients[data.id].activityBreakdown.find(a => a.activity === newAct.activity);
-                    if (existing) {
-                        let et1 = parseInt(existing.time) || 0;
-                        let et2 = parseInt(newAct.time) || 0;
-                        existing.time = `${et1 + et2} s`;
-                    } else {
-                        globalPatients[data.id].activityBreakdown.push(newAct);
-                    }
-                });
-            }
-        } else {
-            globalPatients[data.id] = data;
         }
     }
 }
@@ -158,7 +101,7 @@ function finishPatientLoading() {
                 <span style="font-size: 11px; background: #e0f2fe; color: #0369a1; padding: 3px 8px; border-radius: 4px; font-weight: bold;">${rankBadge}</span>
             </div>
             <div style="font-size: 13px; color: #4b5563; margin-top: 6px;">
-                Puntaje: <b>${patient.score} pts</b> | Activo: <b>${patient.activePercentage}%</b>
+                Puntaje: <b>${patient.score} pts</b> | Registros: <b>${patient.totalRecords}</b>
             </div>
         `;
 
@@ -209,15 +152,7 @@ function renderPatientDashboard(patient, rank, totalPatients) {
         `;
     });
 
-    const rfStatus = patient.randomForestMetrics && patient.randomForestMetrics.status ? patient.randomForestMetrics.status : 'Modelo Activo';
-
     mainContainer.innerHTML = `
-        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 15px; margin-bottom: 20px; font-size: 13px; color: #166534;">
-            <div style="font-weight: bold; margin-bottom: 5px; font-size: 14px;">🤖 Estado del Modelo Random Forest:</div>
-            <div>• <b>Estado:</b> ${rfStatus}</div>
-            <div>• <b>Columnas Procesadas:</b> Columnas 1, 2, 3, 4 y 9 verificadas.</div>
-        </div>
-
         <h2 style="margin-top: 0; color: #1e293b; font-size: 22px;">Datos del Paciente: ${patient.id}</h2>
         <div style="font-size: 14px; color: #475569; margin-bottom: 20px; display: flex; gap: 30px; flex-wrap: wrap;">
             <div>Género: <b>${patient.gender}</b></div>
@@ -244,12 +179,12 @@ function renderPatientDashboard(patient, rank, totalPatients) {
 
         <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #10b981; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
             <div style="display: flex; align-items: center; gap: 8px; font-weight: bold; color: #1e293b; font-size: 16px; margin-bottom: 10px;">
-                🏆 Sistema de Recompensas y Motivación
+                🏆 Sistema de Recompensas
             </div>
             <div style="font-size: 14px; color: #334155; line-height: 1.6;">
                 Puntaje Total: <b style="color: #16a34a;">${patient.score} Puntos</b> | Posición: <b>#${rank} de ${totalPatients}</b><br>
                 Insignia: 🏅 <b>${patient.badge}</b><br>
-                💬 <b>Mensaje de Motivación:</b> <i>"${patient.motivationMessage || '¡Sigue esforzándote!'}"</i>
+                💬 <b>Motivación:</b> <i>"${patient.motivationMessage || '¡Excelente trabajo con tus datos de acelerometría!'}"</i>
             </div>
         </div>
     `;
@@ -308,7 +243,7 @@ function drawChart(records, activityName) {
             warningBox.style.cssText = 'padding: 40px; text-align: center; color: #b91c1c; font-style: italic; background: #fee2e2; border-radius: 8px; margin-top: 10px; font-size: 14px;';
             parent.appendChild(warningBox);
         }
-        warningBox.textContent = `⚠️ No hay datos disponibles para la actividad "${activityName}" en los registros de este archivo.`;
+        warningBox.textContent = `⚠️ No hay registros de acelerometría para la actividad "${activityName}".`;
         ctx.style.display = 'none';
         return;
     } else {
@@ -361,7 +296,7 @@ function renderActivityDataTable(records, activityName) {
         dataTableContainer.innerHTML = `
             <h3 style="color: #1e293b; font-size: 18px; margin-top: 0;">Registros de la Actividad: ${activityName}</h3>
             <div style="padding: 20px; text-align: center; color: #b91c1c; background: #fee2e2; border-radius: 6px; font-size: 14px;">
-                ⚠️ No hay registros reales disponibles para esta actividad.
+                ⚠️ No hay datos disponibles para esta actividad en el archivo.
             </div>
         `;
         return;
@@ -369,12 +304,7 @@ function renderActivityDataTable(records, activityName) {
 
     const displayRows = records.slice(0, 100);
     let rowsHtml = '';
-    const activityLabelsMap = { 
-        1: 'Sentado en la cama', 
-        2: 'Sentado en una silla', 
-        3: 'Acostado', 
-        4: 'Deambulando' 
-    };
+    const activityLabelsMap = { 1: 'Sentado en la cama', 2: 'Sentado en una silla', 3: 'Acostado', 4: 'Deambulando' };
 
     displayRows.forEach(r => {
         let actText = activityLabelsMap[r.activityCode] || `Código ${r.activityCode}`;
@@ -392,7 +322,7 @@ function renderActivityDataTable(records, activityName) {
     dataTableContainer.innerHTML = `
         <h3 style="color: #1e293b; font-size: 18px; margin-top: 0;">Registros Reales: ${activityName}</h3>
         <p style="font-size: 13px; color: #64748b; margin-bottom: 15px;">
-            Mostrando <b>${displayRows.length}</b> de <b>${records.length}</b> registros reales (Columnas 1, 2, 3, 4 y 9).
+            Mostrando <b>${displayRows.length}</b> de <b>${records.length}</b> registros reales extraídos.
         </p>
         <div style="overflow-x: auto; max-height: 350px;">
             <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
@@ -423,7 +353,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const files = Array.from(e.target.files);
         if (files.length === 0) return;
 
-        if (uploadStatus) uploadStatus.textContent = "Procesando datos reales y modelo RF...";
+        if (uploadStatus) uploadStatus.textContent = "Cargando archivos JSON al instante...";
         hideError();
         resetDashboard();
 
@@ -431,15 +361,15 @@ document.addEventListener('DOMContentLoaded', () => {
             for (const file of files) {
                 if (file.name.toLowerCase().endsWith('.zip')) {
                     await processZip(file);
-                } else {
-                    await processTextFile(file);
+                } else if (file.name.toLowerCase().endsWith('.json')) {
+                    await processJsonFile(file);
                 }
             }
             finishPatientLoading();
-            if (uploadStatus) uploadStatus.textContent = "¡Procesamiento completado con éxito!";
+            if (uploadStatus) uploadStatus.textContent = "¡Carga instantánea completada!";
         } catch (err) {
             showError(err.message);
-            if (uploadStatus) uploadStatus.textContent = "Error en el procesamiento";
+            if (uploadStatus) uploadStatus.textContent = "Error en la carga";
         } finally {
             e.target.value = '';
         }
