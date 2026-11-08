@@ -13,7 +13,7 @@ function showError(message) {
         errorDiv.style.cssText = 'background: #fee2e2; color: #b91c1c; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #fecaca; font-size: 14px; font-weight: 500; line-height: 1.5;';
         container.insertBefore(errorDiv, container.firstChild);
     }
-    errorDiv.innerHTML = `⚠️ <b>Error en la validación del archivo:</b> ${message}`;
+    errorDiv.innerHTML = `⚠️ <b>Aviso:</b> ${message}`;
     errorDiv.style.display = 'block';
 }
 
@@ -32,10 +32,13 @@ function resetDashboard() {
     }
     
     const patientList = document.getElementById('patientList');
-    if (patientList) patientList.innerHTML = '<p style="color: #6b7280; font-style: italic;">Cargando e inspeccionando estructura...</p>';
+    if (patientList) patientList.innerHTML = '<p style="color: #6b7280; font-style: italic;">Cargando e inspeccionando archivos...</p>';
     
     const dash = document.getElementById('patientDashboardView');
     if (dash) dash.innerHTML = '';
+
+    const dataTableContainer = document.getElementById('activityDataTableContainer');
+    if (dataTableContainer) dataTableContainer.innerHTML = '';
 }
 
 async function processZip(file) {
@@ -70,7 +73,6 @@ async function processTextFile(file) {
     const formData = new FormData();
     formData.append('file', file);
 
-    // 1. Paso de Inspección Previa
     const inspectResponse = await fetch(`${BACKEND_URL}/inspeccionar`, {
         method: 'POST',
         body: formData
@@ -81,7 +83,6 @@ async function processTextFile(file) {
         throw new Error(inspectData.error || `No se logró identificar la estructura del archivo ${file.name}`);
     }
 
-    // 2. Paso de Análisis y Procesamiento Completo
     const analyzeResponse = await fetch(`${BACKEND_URL}/analizar`, {
         method: 'POST',
         body: formData
@@ -190,7 +191,7 @@ function finishPatientLoading() {
             item.style.borderColor = '#3b82f6';
             activePatientId = id;
             renderPatientDashboard(patient, index + 1, patientIds.length);
-            drawChart(patient.data);
+            updateVisualizationsAndTable(patient.data);
         });
 
         patientList.appendChild(item);
@@ -202,7 +203,7 @@ function finishPatientLoading() {
         if (firstItem) {
             firstItem.style.borderColor = '#3b82f6';
             renderPatientDashboard(globalPatients[activePatientId], 1, patientIds.length);
-            drawChart(globalPatients[activePatientId].data);
+            updateVisualizationsAndTable(globalPatients[activePatientId].data);
         }
     }
 }
@@ -236,12 +237,11 @@ function renderPatientDashboard(patient, rank, totalPatients) {
     const colsDet = meta.columnas_detectadas ? meta.columnas_detectadas.join(', ') : 'Automáticas';
 
     mainContainer.innerHTML = `
-        <!-- Vista previa de estructura identificada (Requisito #6) -->
         <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 15px; margin-bottom: 20px; font-size: 13px; color: #1e40af;">
             <div style="font-weight: bold; margin-bottom: 5px; font-size: 14px;">🔍 Estructura Identificada Automáticamente:</div>
-            <div>• <b>Filas Procesadas:</b> ${meta.total_filas_validas || patient.totalRecords} de ${meta.total_filas_originales || patient.totalRecords}</div>
-            <div>• <b>Encabezados / Columnas:</b> ${colsDet}</div>
-            <div>• <b>Separador detectado:</b> <code>${meta.separador_utilizado || 'Autodetectado'}</code></div>
+            <div>• <b>Registros Totales:</b> ${meta.total_filas_validas || patient.totalRecords}</div>
+            <div>• <b>Columnas Detectadas:</b> ${colsDet}</div>
+            <div>• <b>Separador:</b> <code>${meta.separador_utilizado || 'Autodetectado'}</code></div>
         </div>
 
         <h2 style="margin-top: 0; color: #1e293b; font-size: 22px;">Datos del Paciente: ${patient.id}</h2>
@@ -281,64 +281,160 @@ function renderPatientDashboard(patient, rank, totalPatients) {
     `;
 }
 
-function drawChart(records) {
-    const ctx = document.getElementById('activityChart');
-    if (!ctx || !records) return;
-
+function updateVisualizationsAndTable(records) {
     const selectFilter = document.querySelector('.visualization-container select') || document.querySelector('select');
     
     let filteredRecords = records;
-    if (selectFilter && selectFilter.value && selectFilter.value !== 'Todas las actividades') {
-        const valMap = { 
-            'Sentado en la cama': 1, 
-            'Sentado en una silla': 2, 
-            'Acostado': 3, 
-            'Deambulando': 4
-        };
-        const targetCode = valMap[selectFilter.value];
-        if (targetCode) {
-            filteredRecords = records.filter(r => r.activityCode === targetCode);
+    let selectedActivityName = 'Todas las actividades';
+
+    if (selectFilter && selectFilter.value) {
+        selectedActivityName = selectFilter.value;
+        if (selectedActivityName !== 'Todas las actividades') {
+            const valMap = { 
+                'Sentado en la cama': 1, 
+                'Sentado en una silla': 2, 
+                'Acostado': 3, 
+                'Deambulando': 4
+            };
+            const targetCode = valMap[selectedActivityName];
+            if (targetCode !== undefined) {
+                filteredRecords = records.filter(r => r.activityCode === targetCode);
+            }
         }
     }
 
     if (selectFilter && !selectFilter.dataset.listenerAdded) {
         selectFilter.addEventListener('change', () => {
             if (activePatientId && globalPatients[activePatientId]) {
-                drawChart(globalPatients[activePatientId].data);
+                updateVisualizationsAndTable(globalPatients[activePatientId].data);
             }
         });
         selectFilter.dataset.listenerAdded = 'true';
     }
 
-    const step = Math.max(1, Math.floor(filteredRecords.length / 600));
-    const sampled = filteredRecords.filter((_, i) => i % step === 0);
+    drawChart(filteredRecords, selectedActivityName);
+    renderActivityDataTable(filteredRecords, selectedActivityName);
+}
+
+function drawChart(records, activityName) {
+    const ctx = document.getElementById('activityChart');
+    if (!ctx) return;
+
+    if (chartInstance) {
+        chartInstance.destroy();
+        chartInstance = null;
+    }
+
+    if (!records || records.length === 0) {
+        // Manejo de actividad sin registros (Requisito importante)
+        const parent = ctx.parentNode;
+        let warningBox = document.getElementById('noDataChartMsg');
+        if (!warningBox) {
+            warningBox = document.createElement('div');
+            warningBox.id = 'noDataChartMsg';
+            warningBox.style.cssText = 'padding: 40px; text-align: center; color: #6b7280; font-style: italic; background: #f9fafb; border-radius: 8px; margin-top: 10px;';
+            parent.appendChild(warningBox);
+        }
+        warningBox.textContent = `No hay datos disponibles para la actividad "${activityName}" en este archivo.`;
+        ctx.style.display = 'none';
+        return;
+    } else {
+        const warningBox = document.getElementById('noDataChartMsg');
+        if (warningBox) warningBox.remove();
+        ctx.style.display = 'block';
+    }
+
+    const step = Math.max(1, Math.floor(records.length / 600));
+    const sampled = records.filter((_, i) => i % step === 0);
 
     const labels = sampled.map(r => r.time);
     const frontal = sampled.map(r => r.accFrontal);
     const vertical = sampled.map(r => r.accVertical);
     const lateral = sampled.map(r => r.accLateral);
 
-    if (chartInstance) chartInstance.destroy();
-
     chartInstance = new Chart(ctx, {
         type: 'line',
         data: {
             labels: labels,
             datasets: [
-                { label: 'Acel. Frontal', data: frontal, borderColor: '#3b82f6', borderWidth: 1.5, pointRadius: 0 },
-                { label: 'Acel. Vertical', data: vertical, borderColor: '#10b981', borderWidth: 1.5, pointRadius: 0 },
-                { label: 'Acel. Lateral', data: lateral, borderColor: '#f59e0b', borderWidth: 1.5, pointRadius: 0 }
+                { label: 'Acel. Frontal (G)', data: frontal, borderColor: '#3b82f6', borderWidth: 1.5, pointRadius: 0 },
+                { label: 'Acel. Vertical (G)', data: vertical, borderColor: '#10b981', borderWidth: 1.5, pointRadius: 0 },
+                { label: 'Acel. Lateral (G)', data: lateral, borderColor: '#f59e0b', borderWidth: 1.5, pointRadius: 0 }
             ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             scales: {
-                x: { title: { display: true, text: 'Tiempo Total Acumulado (s)' } },
+                x: { title: { display: true, text: 'Tiempo (s)' } },
                 y: { title: { display: true, text: 'Aceleración (G)' } }
             }
         }
     });
+}
+
+function renderActivityDataTable(records, activityName) {
+    let dataTableContainer = document.getElementById('activityDataTableContainer');
+    const mainContainer = document.querySelector('.main-container') || document.body;
+
+    if (!dataTableContainer) {
+        dataTableContainer = document.createElement('div');
+        dataTableContainer.id = 'activityDataTableContainer';
+        dataTableContainer.style.cssText = 'background: white; border-radius: 10px; padding: 25px; border: 1px solid #e5e7eb; margin-top: 20px;';
+        mainContainer.appendChild(dataTableContainer);
+    }
+
+    if (!records || records.length === 0) {
+        dataTableContainer.innerHTML = `
+            <h3 style="color: #1e293b; font-size: 18px; margin-top: 0;">Registros Reales: ${activityName}</h3>
+            <div style="padding: 20px; text-align: center; color: #b91c1c; background: #fee2e2; border-radius: 6px; font-size: 14px;">
+                ⚠️ No hay datos disponibles para la actividad seleccionada en el archivo cargado.
+            </div>
+        `;
+        return;
+    }
+
+    // Limitar vista previa a las primeras 100 filas para fluidez en el DOM, indicando el total real
+    const displayRows = records.slice(0, 100);
+    let rowsHtml = '';
+
+    const activityLabelsMap = { 1: 'Sentado en la cama', 2: 'Sentado en una silla', 3: 'Acostado', 4: 'Deambulando' };
+
+    displayRows.forEach(r => {
+        let actText = activityLabelsMap[r.activityCode] || `Código ${r.activityCode}`;
+        rowsHtml += `
+            <tr style="border-bottom: 1px solid #f1f5f9;">
+                <td style="padding: 10px; color: #334155;">${r.time} s</td>
+                <td style="padding: 10px; color: #3b82f6;">${r.accFrontal}</td>
+                <td style="padding: 10px; color: #10b981;">${r.accVertical}</td>
+                <td style="padding: 10px; color: #f59e0b;">${r.accLateral}</td>
+                <td style="padding: 10px; font-weight: 500; color: #475569;">${actText}</td>
+            </tr>
+        `;
+    });
+
+    dataTableContainer.innerHTML = `
+        <h3 style="color: #1e293b; font-size: 18px; margin-top: 0;">Registros Reales de la Actividad: ${activityName}</h3>
+        <p style="font-size: 13px; color: #64748b; margin-bottom: 15px;">
+            Mostrando <b>${displayRows.length}</b> de <b>${records.length}</b> registros reales extraídos del archivo.
+        </p>
+        <div style="overflow-x: auto; max-height: 350px;">
+            <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
+                <thead>
+                    <tr style="border-bottom: 2px solid #e2e8f0; color: #64748b; background: #f8fafc; position: sticky; top: 0;">
+                        <th style="padding: 10px;">Tiempo</th>
+                        <th style="padding: 10px;">Acel. Frontal</th>
+                        <th style="padding: 10px;">Acel. Vertical</th>
+                        <th style="padding: 10px;">Acel. Lateral</th>
+                        <th style="padding: 10px;">Actividad Identificada</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rowsHtml}
+                </tbody>
+            </table>
+        </div>
+    `;
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -351,7 +447,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const files = Array.from(e.target.files);
         if (files.length === 0) return;
 
-        if (uploadStatus) uploadStatus.textContent = "Inspeccionando y procesando...";
+        if (uploadStatus) uploadStatus.textContent = "Procesando datos reales...";
         hideError();
         resetDashboard();
 
@@ -364,10 +460,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
             finishPatientLoading();
-            if (uploadStatus) uploadStatus.textContent = "¡Estructura validada y cargada!";
+            if (uploadStatus) uploadStatus.textContent = "¡Datos reales cargados!";
         } catch (err) {
             showError(err.message);
-            if (uploadStatus) uploadStatus.textContent = "Error en la estructura del archivo";
+            if (uploadStatus) uploadStatus.textContent = "Error en la lectura";
         } finally {
             e.target.value = '';
         }
