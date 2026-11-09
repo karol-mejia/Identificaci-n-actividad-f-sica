@@ -1,0 +1,77 @@
+{
+  "id": "d1p31F",
+  "gender": "Femenino",
+  "totalRecords": 8,
+  "totalTime": "138 s",
+  "score": 69,
+  "badge": "Bronce (Nivel Iniciador)",
+  "motivationMessage": "Registro procesado con éxito. Se recomienda incrementar los periodos de deambulación.",
+  "activityBreakdown": [
+    {
+      "code": 1,
+      "activity": "Sentado en una cama",
+      "records": 8,
+      "time": "138 s",
+      "percentage": "100.0%",
+      "points": "+69 pts"
+    }
+  ],
+  "data": [
+    {
+      "time": 0.0,
+      "accFrontal": -0.27906,
+      "accVertical": 0.0,
+      "accLateral": 0.89339,
+      "activityCode": 1
+    },
+    {
+      "time": 3.0,
+      "accFrontal": 0.18995,
+      "accVertical": 0.0,
+      "accLateral": 0.99674,
+      "activityCode": 1
+    },
+    {
+      "time": 125.0,
+      "accFrontal": 0.27203,
+      "accVertical": -0.036746,
+      "accLateral": 0.1,
+      "activityCode": 1
+    },
+    {
+      "time": 126.0,
+      "accFrontal": 0.43619,
+      "accVertical": 0.0,
+      "accLateral": 0.14698,
+      "activityCode": 1
+    },
+    {
+      "time": 127.25,
+      "accFrontal": 0.0,
+      "accVertical": 0.43619,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 129.75,
+      "accFrontal": 0.0,
+      "accVertical": 0.43619,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 133.25,
+      "accFrontal": 0.0,
+      "accVertical": 0.43619,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 138.0,
+      "accFrontal": 0.43619,
+      "accVertical": 0.0,
+      "accLateral": 0.14698,
+      "activityCode": 1
+    }
+  ]
+}

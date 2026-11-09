@@ -1,0 +1,1078 @@
+{
+  "id": "d1p22F",
+  "gender": "Femenino",
+  "totalRecords": 151,
+  "totalTime": "271 s",
+  "score": 135,
+  "badge": "Bronce (Nivel Iniciador)",
+  "motivationMessage": "Registro procesado con éxito. Se recomienda incrementar los periodos de deambulación.",
+  "activityBreakdown": [
+    {
+      "code": 1,
+      "activity": "Sentado en una cama",
+      "records": 151,
+      "time": "271 s",
+      "percentage": "100.0%",
+      "points": "+135 pts"
+    }
+  ],
+  "data": [
+    {
+      "time": 0.1,
+      "accFrontal": 0.1866,
+      "accVertical": 0.0,
+      "accLateral": 0.043636,
+      "activityCode": 1
+    },
+    {
+      "time": 0.5,
+      "accFrontal": 0.1,
+      "accVertical": 0.1866,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 0.75,
+      "accFrontal": 0.1,
+      "accVertical": 0.1866,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 1.1,
+      "accFrontal": 0.1866,
+      "accVertical": 0.0,
+      "accLateral": 0.043636,
+      "activityCode": 1
+    },
+    {
+      "time": 2.5,
+      "accFrontal": 0.1,
+      "accVertical": 0.1866,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 3.1,
+      "accFrontal": 0.1866,
+      "accVertical": 0.0,
+      "accLateral": 0.055119,
+      "activityCode": 1
+    },
+    {
+      "time": 3.25,
+      "accFrontal": 0.1,
+      "accVertical": 0.1866,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 4.1,
+      "accFrontal": 0.0107,
+      "accVertical": 0.0,
+      "accLateral": 0.12402,
+      "activityCode": 1
+    },
+    {
+      "time": 4.25,
+      "accFrontal": 0.1,
+      "accVertical": 0.0107,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 4.75,
+      "accFrontal": 0.1,
+      "accVertical": 0.0107,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 5.25,
+      "accFrontal": 0.1,
+      "accVertical": 0.0107,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 6.1,
+      "accFrontal": 0.1045,
+      "accVertical": 0.0,
+      "accLateral": 0.078086,
+      "activityCode": 1
+    },
+    {
+      "time": 6.25,
+      "accFrontal": 0.1,
+      "accVertical": 0.1045,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 6.75,
+      "accFrontal": 0.1,
+      "accVertical": 0.1045,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 7.1,
+      "accFrontal": 0.1045,
+      "accVertical": 0.0,
+      "accLateral": 0.078086,
+      "activityCode": 1
+    },
+    {
+      "time": 8.25,
+      "accFrontal": 0.1,
+      "accVertical": 0.2452,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 8.5,
+      "accFrontal": 0.1,
+      "accVertical": 0.2452,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 8.75,
+      "accFrontal": 0.1,
+      "accVertical": 0.2452,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 9.25,
+      "accFrontal": 0.1,
+      "accVertical": 0.2452,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 9.5,
+      "accFrontal": 0.1,
+      "accVertical": 0.2452,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 10.5,
+      "accFrontal": 0.1,
+      "accVertical": 0.1045,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 10.75,
+      "accFrontal": 0.1,
+      "accVertical": 0.1045,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 11.25,
+      "accFrontal": 0.1,
+      "accVertical": 0.1045,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 11.5,
+      "accFrontal": 0.1,
+      "accVertical": 0.1045,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 12.1,
+      "accFrontal": 0.1045,
+      "accVertical": 0.0,
+      "accLateral": 0.078086,
+      "activityCode": 1
+    },
+    {
+      "time": 13.0,
+      "accFrontal": 0.99901,
+      "accVertical": 0.0,
+      "accLateral": 0.1355,
+      "activityCode": 1
+    },
+    {
+      "time": 13.5,
+      "accFrontal": 0.0,
+      "accVertical": 0.99901,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 14.0,
+      "accFrontal": 0.99901,
+      "accVertical": 0.0,
+      "accLateral": 0.1355,
+      "activityCode": 1
+    },
+    {
+      "time": 14.5,
+      "accFrontal": 0.0,
+      "accVertical": 0.99901,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 15.5,
+      "accFrontal": 0.1,
+      "accVertical": 0.0342,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 15.75,
+      "accFrontal": 0.1,
+      "accVertical": 0.0342,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 16.1,
+      "accFrontal": 0.0342,
+      "accVertical": 0.0,
+      "accLateral": 0.11254,
+      "activityCode": 1
+    },
+    {
+      "time": 16.5,
+      "accFrontal": 0.1,
+      "accVertical": 0.0342,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 18.0,
+      "accFrontal": 0.99901,
+      "accVertical": 0.0,
+      "accLateral": 0.12402,
+      "activityCode": 1
+    },
+    {
+      "time": 18.5,
+      "accFrontal": 0.1,
+      "accVertical": 0.0694,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 19.1,
+      "accFrontal": 0.0694,
+      "accVertical": 0.0,
+      "accLateral": 0.10105,
+      "activityCode": 1
+    },
+    {
+      "time": 19.5,
+      "accFrontal": 0.1,
+      "accVertical": 0.0694,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 19.75,
+      "accFrontal": 0.1,
+      "accVertical": 0.0694,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 20.25,
+      "accFrontal": 0.1,
+      "accVertical": 0.0694,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 20.5,
+      "accFrontal": 0.1,
+      "accVertical": 0.0694,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 21.25,
+      "accFrontal": 0.0,
+      "accVertical": 0.96383,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 21.5,
+      "accFrontal": 0.0,
+      "accVertical": 0.96383,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 22.25,
+      "accFrontal": 0.0,
+      "accVertical": 0.96383,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 23.0,
+      "accFrontal": 0.98728,
+      "accVertical": 0.0,
+      "accLateral": 0.15847,
+      "activityCode": 1
+    },
+    {
+      "time": 23.5,
+      "accFrontal": 0.0,
+      "accVertical": 0.98728,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 23.75,
+      "accFrontal": 0.0,
+      "accVertical": 0.98728,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 24.0,
+      "accFrontal": 0.98728,
+      "accVertical": 0.0,
+      "accLateral": 0.15847,
+      "activityCode": 1
+    },
+    {
+      "time": 25.1,
+      "accFrontal": 0.1397,
+      "accVertical": 0.0,
+      "accLateral": 0.066602,
+      "activityCode": 1
+    },
+    {
+      "time": 25.25,
+      "accFrontal": 0.1,
+      "accVertical": 0.1397,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 25.5,
+      "accFrontal": 0.1,
+      "accVertical": 0.1397,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 26.1,
+      "accFrontal": 0.1397,
+      "accVertical": 0.0,
+      "accLateral": 0.066602,
+      "activityCode": 1
+    },
+    {
+      "time": 26.5,
+      "accFrontal": 0.1,
+      "accVertical": 0.1163,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 27.25,
+      "accFrontal": 0.1,
+      "accVertical": 0.1163,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 27.75,
+      "accFrontal": 0.1,
+      "accVertical": 0.1163,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 28.1,
+      "accFrontal": 0.1163,
+      "accVertical": 0.0,
+      "accLateral": 0.10105,
+      "activityCode": 1
+    },
+    {
+      "time": 28.5,
+      "accFrontal": 0.0,
+      "accVertical": 0.94038,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 28.75,
+      "accFrontal": 0.0,
+      "accVertical": 0.94038,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 29.25,
+      "accFrontal": 0.0,
+      "accVertical": 0.94038,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 30.25,
+      "accFrontal": 0.1,
+      "accVertical": 0.1514,
+      "accLateral": -0.0022966,
+      "activityCode": 1
+    },
+    {
+      "time": 30.5,
+      "accFrontal": 0.1,
+      "accVertical": 0.1514,
+      "accLateral": -0.0022966,
+      "activityCode": 1
+    },
+    {
+      "time": 30.75,
+      "accFrontal": 0.1,
+      "accVertical": 0.1514,
+      "accLateral": -0.0022966,
+      "activityCode": 1
+    },
+    {
+      "time": 31.1,
+      "accFrontal": 0.1514,
+      "accVertical": -0.0022966,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 31.75,
+      "accFrontal": 0.1,
+      "accVertical": 0.1514,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 32.5,
+      "accFrontal": 0.1,
+      "accVertical": 0.1514,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 33.1,
+      "accFrontal": 0.1514,
+      "accVertical": 0.0,
+      "accLateral": 0.032153,
+      "activityCode": 1
+    },
+    {
+      "time": 33.5,
+      "accFrontal": 0.1,
+      "accVertical": 0.0811,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 33.75,
+      "accFrontal": 0.1,
+      "accVertical": 0.0811,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 34.5,
+      "accFrontal": 0.1,
+      "accVertical": 0.0811,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 34.75,
+      "accFrontal": 0.1,
+      "accVertical": 0.0811,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 35.1,
+      "accFrontal": 0.0811,
+      "accVertical": 0.0,
+      "accLateral": 0.066602,
+      "activityCode": 1
+    },
+    {
+      "time": 35.25,
+      "accFrontal": 0.1,
+      "accVertical": 0.0811,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 35.75,
+      "accFrontal": 0.0,
+      "accVertical": 0.97555,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 36.25,
+      "accFrontal": 0.0,
+      "accVertical": 0.97555,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 36.5,
+      "accFrontal": 0.0,
+      "accVertical": 0.97555,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 37.0,
+      "accFrontal": 0.97555,
+      "accVertical": 0.0,
+      "accLateral": 0.15847,
+      "activityCode": 1
+    },
+    {
+      "time": 37.75,
+      "accFrontal": 0.1,
+      "accVertical": 0.0342,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 38.25,
+      "accFrontal": 0.1,
+      "accVertical": 0.0342,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 39.25,
+      "accFrontal": 0.0,
+      "accVertical": 0.98728,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 40.25,
+      "accFrontal": 0.1,
+      "accVertical": 0.1983,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 40.75,
+      "accFrontal": 0.1,
+      "accVertical": 0.1983,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 41.1,
+      "accFrontal": 0.1983,
+      "accVertical": 0.0,
+      "accLateral": 0.055119,
+      "activityCode": 1
+    },
+    {
+      "time": 41.5,
+      "accFrontal": 0.1,
+      "accVertical": 0.1983,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 42.5,
+      "accFrontal": 0.1,
+      "accVertical": 0.2218,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 43.5,
+      "accFrontal": 0.1,
+      "accVertical": 0.0811,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 43.75,
+      "accFrontal": 0.1,
+      "accVertical": 0.0811,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 44.5,
+      "accFrontal": 0.1,
+      "accVertical": 0.0811,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 45.1,
+      "accFrontal": 0.0811,
+      "accVertical": 0.0,
+      "accLateral": 0.10105,
+      "activityCode": 1
+    },
+    {
+      "time": 45.5,
+      "accFrontal": 0.0,
+      "accVertical": 0.98728,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 46.0,
+      "accFrontal": 0.98728,
+      "accVertical": 0.0,
+      "accLateral": 0.14698,
+      "activityCode": 1
+    },
+    {
+      "time": 46.25,
+      "accFrontal": 0.0,
+      "accVertical": 0.98728,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 46.75,
+      "accFrontal": 0.0,
+      "accVertical": 0.98728,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 47.75,
+      "accFrontal": 0.0,
+      "accVertical": 0.99901,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 48.25,
+      "accFrontal": 0.0,
+      "accVertical": 0.99901,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 48.5,
+      "accFrontal": 0.0,
+      "accVertical": 0.99901,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 49.5,
+      "accFrontal": 0.1,
+      "accVertical": 0.0576,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 50.5,
+      "accFrontal": 0.1,
+      "accVertical": 0.2218,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 50.75,
+      "accFrontal": 0.1,
+      "accVertical": 0.2218,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 51.25,
+      "accFrontal": 0.1,
+      "accVertical": 0.2218,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 51.5,
+      "accFrontal": 0.1,
+      "accVertical": 0.2218,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 53.0,
+      "accFrontal": 0.99901,
+      "accVertical": 0.0,
+      "accLateral": 0.11254,
+      "activityCode": 1
+    },
+    {
+      "time": 53.5,
+      "accFrontal": 0.0,
+      "accVertical": 0.99901,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 54.25,
+      "accFrontal": 0.0,
+      "accVertical": 0.99901,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 55.1,
+      "accFrontal": 0.1866,
+      "accVertical": 0.0,
+      "accLateral": 0.066602,
+      "activityCode": 1
+    },
+    {
+      "time": 55.25,
+      "accFrontal": 0.1,
+      "accVertical": 0.1866,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 55.75,
+      "accFrontal": 0.1,
+      "accVertical": 0.1866,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 56.1,
+      "accFrontal": 0.1866,
+      "accVertical": 0.0,
+      "accLateral": 0.066602,
+      "activityCode": 1
+    },
+    {
+      "time": 57.0,
+      "accFrontal": 0.96383,
+      "accVertical": -0.01378,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 64.25,
+      "accFrontal": -0.45495,
+      "accVertical": 0.0,
+      "accLateral": 0.53741,
+      "activityCode": 1
+    },
+    {
+      "time": 64.375,
+      "accFrontal": -0.45495,
+      "accVertical": 0.0,
+      "accLateral": 0.53741,
+      "activityCode": 1
+    },
+    {
+      "time": 64.45,
+      "accFrontal": -0.45495,
+      "accVertical": 0.0,
+      "accLateral": 0.88191,
+      "activityCode": 1
+    },
+    {
+      "time": 64.475,
+      "accFrontal": -0.45495,
+      "accVertical": 0.0,
+      "accLateral": 0.88191,
+      "activityCode": 1
+    },
+    {
+      "time": 64.525,
+      "accFrontal": -0.45495,
+      "accVertical": 0.0,
+      "accLateral": 0.88191,
+      "activityCode": 1
+    },
+    {
+      "time": 64.575,
+      "accFrontal": -0.51357,
+      "accVertical": 0.0,
+      "accLateral": 0.97377,
+      "activityCode": 1
+    },
+    {
+      "time": 64.6,
+      "accFrontal": -0.49012,
+      "accVertical": 0.0,
+      "accLateral": 0.92784,
+      "activityCode": 1
+    },
+    {
+      "time": 64.75,
+      "accFrontal": -0.65428,
+      "accVertical": 0.0,
+      "accLateral": 0.88191,
+      "activityCode": 1
+    },
+    {
+      "time": 64.85,
+      "accFrontal": -0.65428,
+      "accVertical": 0.0,
+      "accLateral": 0.88191,
+      "activityCode": 1
+    },
+    {
+      "time": 250.0,
+      "accFrontal": 0.78795,
+      "accVertical": 0.0,
+      "accLateral": 0.12402,
+      "activityCode": 1
+    },
+    {
+      "time": 251.25,
+      "accFrontal": 0.0,
+      "accVertical": 0.82312,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 252.25,
+      "accFrontal": 0.1,
+      "accVertical": 0.0928,
+      "accLateral": -0.025263,
+      "activityCode": 1
+    },
+    {
+      "time": 252.5,
+      "accFrontal": 0.1,
+      "accVertical": 0.0928,
+      "accLateral": -0.025263,
+      "activityCode": 1
+    },
+    {
+      "time": 253.25,
+      "accFrontal": 0.0,
+      "accVertical": 0.77622,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 253.5,
+      "accFrontal": 0.0,
+      "accVertical": 0.77622,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 254.75,
+      "accFrontal": 0.0,
+      "accVertical": 0.99901,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 255.25,
+      "accFrontal": 0.0,
+      "accVertical": 0.78795,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 255.5,
+      "accFrontal": 0.0,
+      "accVertical": 0.78795,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 256.75,
+      "accFrontal": 0.0,
+      "accVertical": 0.87003,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 257.25,
+      "accFrontal": 0.0,
+      "accVertical": 0.87003,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 257.5,
+      "accFrontal": 0.0,
+      "accVertical": 0.7645,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 258.0,
+      "accFrontal": 0.7645,
+      "accVertical": 0.0,
+      "accLateral": 0.1355,
+      "activityCode": 1
+    },
+    {
+      "time": 258.25,
+      "accFrontal": 0.0,
+      "accVertical": 0.7645,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 258.5,
+      "accFrontal": 0.0,
+      "accVertical": 0.7645,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 259.5,
+      "accFrontal": 0.1,
+      "accVertical": 0.0576,
+      "accLateral": -0.01378,
+      "activityCode": 1
+    },
+    {
+      "time": 261.25,
+      "accFrontal": 0.0,
+      "accVertical": 0.84658,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 262.1,
+      "accFrontal": 0.1163,
+      "accVertical": -0.025263,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 262.5,
+      "accFrontal": 0.1,
+      "accVertical": 0.1045,
+      "accLateral": -0.025263,
+      "activityCode": 1
+    },
+    {
+      "time": 263.25,
+      "accFrontal": 0.1,
+      "accVertical": 0.1163,
+      "accLateral": -0.025263,
+      "activityCode": 1
+    },
+    {
+      "time": 264.25,
+      "accFrontal": 0.0,
+      "accVertical": 0.75277,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 264.5,
+      "accFrontal": 0.0,
+      "accVertical": 0.75277,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 265.25,
+      "accFrontal": 0.0,
+      "accVertical": 0.97555,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 265.75,
+      "accFrontal": 0.0,
+      "accVertical": 0.75277,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 266.25,
+      "accFrontal": 0.0,
+      "accVertical": 0.75277,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 266.5,
+      "accFrontal": 0.0,
+      "accVertical": 0.75277,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 267.0,
+      "accFrontal": 0.8583,
+      "accVertical": 0.0,
+      "accLateral": 0.12402,
+      "activityCode": 1
+    },
+    {
+      "time": 267.25,
+      "accFrontal": 0.0,
+      "accVertical": 0.8583,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 268.0,
+      "accFrontal": 0.8114,
+      "accVertical": 0.0,
+      "accLateral": 0.1355,
+      "activityCode": 1
+    },
+    {
+      "time": 268.5,
+      "accFrontal": 0.0,
+      "accVertical": 0.8114,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 269.25,
+      "accFrontal": 0.0,
+      "accVertical": 0.82312,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 270.1,
+      "accFrontal": 0.1866,
+      "accVertical": -0.16306,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 271.0,
+      "accFrontal": 0.83485,
+      "accVertical": -0.0022966,
+      "accLateral": 0.0,
+      "activityCode": 1
+    },
+    {
+      "time": 271.5,
+      "accFrontal": 0.0,
+      "accVertical": 0.83485,
+      "accLateral": -0.0022966,
+      "activityCode": 1
+    },
+    {
+      "time": 272.0,
+      "accFrontal": 0.83485,
+      "accVertical": -0.0022966,
+      "accLateral": 0.0,
+      "activityCode": 1
+    }
+  ]
+}
