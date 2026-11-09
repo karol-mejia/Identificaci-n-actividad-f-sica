@@ -2,59 +2,60 @@ import os
 import re
 import json
 import glob
+import numpy as np
 import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, confusion_matrix
 
 def decodificar_texto(file_bytes):
     encodings = ['utf-16', 'utf-16le', 'utf-16be', 'utf-8', 'latin-1', 'cp1252']
     for enc in encodings:
         try:
             text = file_bytes.decode(enc)
-            if text and len(text.strip()) > 0:
-                if enc in ['utf-16', 'utf-16le', 'utf-16be', 'utf-8']:
-                    return text
-                if text.count('\x00') < (len(text) * 0.05):
-                    return text
+            if text and len(text.strip()) > 8:
+                return text
         except Exception:
             continue
     return file_bytes.decode('latin-1', errors='ignore')
 
-def procesar_archivo_a_json(filepath):
+def mapear_etiqueta_actividad(b_lower, code_raw=None):
+    if code_raw is not None and code_raw in [1, 2, 3, 4]:
+        mapping_codes = {
+            1: "Sentado en una cama",
+            2: "Sentado en una silla",
+            3: "Acostado",
+            4: "Deambulando"
+        }
+        return code_raw, mapping_codes[code_raw]
+    
+    if 'acostad' in b_lower:
+        return 3, "Acostado"
+    elif 'silla' in b_lower:
+        return 2, "Sentado en una silla"
+    elif 'cama' in b_lower:
+        return 1, "Sentado en una cama"
+    elif any(w in b_lower for w in ['marcha', 'caminar', 'deambula']):
+        return 4, "Deambulando"
+    elif 'sentad' in b_lower:
+        return 2, "Sentado en una silla"
+    else:
+        return 1, "Sentado en una cama"
+
+def procesar_archivo_a_df(filepath):
     filename = os.path.basename(filepath)
     clean_filename = os.path.splitext(filename)[0]
     b_lower = filename.lower()
-
-    if 'acostada' in b_lower:
-        activity_code = 3
-        act_name = 'Acostado'
-    elif 'sentada' in b_lower:
-        activity_code = 2
-        act_name = 'Sentado en una silla'
-    elif 'bipeda' in b_lower or 'bípeda' in b_lower:
-        activity_code = 2
-        act_name = 'Bípeda / Estática'
-    elif 'marcha' in b_lower or 'caminar' in b_lower:
-        activity_code = 4
-        act_name = 'Deambulando'
-    else:
-        activity_code = 1
-        act_name = 'Sentado en la cama'
-
-    words = re.split(r'[_\s-]+', clean_filename)
-    clean_words = [w.strip() for w in words if w.lower() not in ['sentada', 'bipeda', 'bípeda', 'marcha', 'acostada', 'caminar', 'datos'] and not w.isdigit()]
-    patient_id = " ".join(clean_words).strip().title()
-    if not patient_id:
-        patient_id = f"Paciente {clean_filename.upper()}"
-
+    
     try:
         with open(filepath, 'rb') as f:
             file_bytes = f.read()
-    except Exception as e:
-        print(f"❌ No se pudo abrir {filename}: {e}")
+    except Exception:
         return None
-
+    
     text_data = decodificar_texto(file_bytes)
     lines = text_data.splitlines()
-
+    
     data_rows = []
     for line in lines:
         line_str = line.strip()
@@ -64,115 +65,162 @@ def procesar_archivo_a_json(filepath):
         normalized = line_str.replace(',', '.')
         nums = re.findall(r'[-+]?\d*\.?\d+', normalized)
         
-        if len(nums) >= 2:
+        # Mínimo 4 columnas requeridas (Col 1: t, Col 2: ax, Col 3: ay, Col 4: az)
+        if len(nums) >= 4:
             try:
-                t_val = float(nums[0])
-                ax = float(nums[1])
-                ay = float(nums[2]) if len(nums) > 2 else ax
-                az = float(nums[3]) if len(nums) > 3 else ax
+                t_val = float(nums[0])   # Columna 1
+                ax = float(nums[1])      # Columna 2
+                ay = float(nums[2])      # Columna 3
+                az = float(nums[3])      # Columna 4
                 
-                code_to_use = activity_code
-                if len(nums) >= 9:
-                    try:
-                        code_to_use = int(float(nums[8]))
-                    except:
-                        code_to_use = activity_code
-
+                # Columna 9 (Etiqueta opcional si está presente en la fila)
+                code_raw = int(float(nums[8])) if len(nums) >= 9 else None
+                act_code, act_name = mapear_etiqueta_actividad(b_lower, code_raw)
+                
                 data_rows.append({
                     "time": t_val,
                     "accFrontal": ax,
                     "accVertical": ay,
                     "accLateral": az,
-                    "activityCode": code_to_use
+                    "activityCode": act_code,
+                    "activityName": act_name
                 })
             except Exception:
                 continue
 
     if not data_rows:
         return None
-
-    df = pd.DataFrame(data_rows)
-    total_records = len(df)
     
-    t_min = df['time'].min()
-    t_max = df['time'].max()
-    raw_duration = t_max - t_min
+    df = pd.DataFrame(data_rows)
+    return clean_filename, df
 
-    if raw_duration > 10000:
-        total_time = int(round(raw_duration / 1000.0))
-        df['time'] = ((df['time'] - t_min) / 1000.0).round(1)
-    elif raw_duration > 0:
-        total_time = int(round(raw_duration))
-        df['time'] = (df['time'] - t_min).round(1)
-    else:
-        total_time = max(1, int(round(total_records / 50.0)))
-        df['time'] = [round(i / 50.0, 1) for i in range(total_records)]
+def entrenar_evaluar_random_forest(df_total):
+    print("\n--- Entrenamiento del Random Forest con datos reales del ZIP ---")
+    
+    # Selección de columnas 2, 3 y 4 como Features (X) y columna 9 como Target (y)
+    X = df_total[['accFrontal', 'accVertical', 'accLateral']]
+    y = df_total['activityCode']
+    
+    # División de datos (Stratified para evitar fuga de datos entre splits)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.3, random_state=42, stratify=y
+    )
+    
+    clf = RandomForestClassifier(n_estimators=100, random_state=42)
+    clf.fit(X_train, y_train)
+    
+    y_pred = clf.predict(X_test)
+    
+    print("\n[Reporte de Clasificación]")
+    print(classification_report(y_test, y_pred, target_names=[
+        "Sentado en una cama (1)",
+        "Sentado en una silla (2)",
+        "Acostado (3)",
+        "Deambulando (4)"
+    ]))
+    
+    print("\n[Matriz de Confusión]")
+    cm = confusion_matrix(y_test, y_pred, labels=[1, 2, 3, 4])
+    print(cm)
+    
+    return clf
 
-    total_time = max(1, total_time)
-    pts_config = {1: 5, 2: 5, 3: 2, 4: 30}
-    pts_per_sec = pts_config.get(activity_code, 5)
-    points_earned = int(total_time * (pts_per_sec / 10.0) * 10)
-
-    json_data = {
-        "id": patient_id,
-        "gender": "Femenino" if clean_filename[-1].upper() == 'F' else "Masculino",
-        "totalRecords": total_records,
-        "totalTime": f"{total_time} s",
-        "score": points_earned,
-        "badge": "Oro (Nivel Avanzado)" if points_earned > 1500 else ("Plata (Nivel Intermedio)" if points_earned > 800 else "Bronce (Nivel Iniciador)"),
-        "activePercentage": 100.0,
-        "motivationMessage": "¡Gran trabajo! Tus datos reales de acelerometría se han procesado correctamente.",
-        "activityBreakdown": [{
-            "activity": act_name,
-            "time": f"{total_time} s",
-            "percentage": "100.0%",
-            "points": f"+{points_earned} pts",
-            "code": activity_code
-        }],
-        "data": df.to_dict(orient='records')
-    }
-
-    return json_data
-
-def convertir_carpeta():
+def convertir_zip_dataset(carpeta_entrada="dataset_zip"):
     output_dir = "json_convertidos"
     os.makedirs(output_dir, exist_ok=True)
     
-    # Búsqueda recursiva en todas las subcarpetas (S1_Dataset, S2_Dataset, etc.)
     extensiones = ['*.txt', '*.txtux', '*.csv', '*.dat']
     archivos = []
     for ext in extensiones:
-        archivos.extend(glob.glob(f"**/{ext}", recursive=True))
+        archivos.extend(glob.glob(f"{carpeta_entrada}/**/{ext}", recursive=True))
     
-    print(f"📦 Encontrados {len(archivos)} archivos en total dentro de las subcarpetas...")
-
-    pacientes_unificados = {}
-
+    print(f"Archivos reales encontrados en el dataset: {len(archivos)}")
+    
+    todos_los_dfs = []
+    pacientes_datos = {}
+    
     for f in archivos:
-        res = procesar_archivo_a_json(f)
+        res = procesar_archivo_a_df(f)
         if res:
-            pid = res["id"]
-            if pid not in pacientes_unificados:
-                pacientes_unificados[pid] = res
-            else:
-                p = pacientes_unificados[pid]
-                p["totalRecords"] += res["totalRecords"]
-                p["score"] += res["score"]
-                p["activityBreakdown"].extend(res["activityBreakdown"])
+            p_id, df_file = res
+            todos_los_dfs.append(df_file)
+            
+            if p_id not in pacientes_datos:
+                pacientes_datos[p_id] = []
+            pacientes_datos[p_id].append(df_file)
+            
+    if not todos_los_dfs:
+        print("No se encontraron registros válidos en el ZIP.")
+        return
+    
+    df_global = pd.concat(todos_los_dfs, ignore_index=True)
+    
+    # Entrenar Random Forest globalmente con los datos extraídos del ZIP
+    modelo_rf = entrenar_evaluar_random_forest(df_global)
+    
+    # Generar JSONs por paciente con predicciones, puntuaciones y mensajes reales
+    for pid, list_dfs in pacientes_datos.items():
+        df_paciente = pd.concat(list_dfs, ignore_index=True)
+        
+        # Inferencia con Random Forest
+        X_pac = df_paciente[['accFrontal', 'accVertical', 'accLateral']]
+        df_paciente['predictedCode'] = modelo_rf.predict(X_pac)
+        
+        # Cálculo dinámico de puntuación según la actividad real identificada
+        pts_config = {1: 5, 2: 5, 3: 2, 4: 30}
+        total_records = len(df_paciente)
+        total_time_s = max(1, int(df_paciente['time'].max() - df_paciente['time'].min())) if total_records > 1 else 1
+        
+        score_total = 0
+        breakdown = []
+        
+        for code in [1, 2, 3, 4]:
+            sub_df = df_paciente[df_paciente['predictedCode'] == code]
+            rec_count = len(sub_df)
+            if rec_count > 0:
+                name_act = {1: "Sentado en una cama", 2: "Sentado en una silla", 3: "Acostado", 4: "Deambulando"}[code]
+                duration_act = int((rec_count / total_records) * total_time_s)
+                pts_act = int(duration_act * (pts_config[code] / 10.0))
+                score_total += pts_act
                 
-                prev_max_time = p["data"][-1]["time"] if p["data"] else 0
-                for row in res["data"]:
-                    row["time"] = round(row["time"] + prev_max_time, 1)
-                p["data"].extend(res["data"])
+                breakdown.append({
+                    "code": code,
+                    "activity": name_act,
+                    "records": rec_count,
+                    "time": f"{duration_act} s",
+                    "percentage": f"{round((rec_count / total_records) * 100, 1)}%",
+                    "points": f"+{pts_act} pts"
+                })
+        
+        # Mensajes de motivación basados en resultados dinámicos reales
+        if score_total > 1000:
+            msg = "¡Excelente nivel de movimiento! Tus registros de acelerometría reflejan un gran desempeño dinámico."
+            badge = "Oro (Nivel Avanzado)"
+        elif score_total > 400:
+            msg = "Buen equilibrio de actividad física. Continúa manteniendo una rutina constante."
+            badge = "Plata (Nivel Intermedio)"
+        else:
+            msg = "Registro procesado con éxito. Se recomienda incrementar los periodos de deambulación."
+            badge = "Bronce (Nivel Iniciador)"
 
-    for pid, pdata in pacientes_unificados.items():
-        filename_json = f"{re.sub(r'[^a-zA-Z0-9_]', '_', pid)}.json"
-        ruta_salida = os.path.join(output_dir, filename_json)
+        json_output = {
+            "id": pid,
+            "totalRecords": total_records,
+            "totalTime": f"{total_time_s} s",
+            "score": score_total,
+            "badge": badge,
+            "motivationMessage": msg,
+            "activityBreakdown": breakdown,
+            "data": df_paciente[['time', 'accFrontal', 'accVertical', 'accLateral', 'predictedCode']].rename(
+                columns={'predictedCode': 'activityCode'}
+            ).to_dict(orient='records')
+        }
+        
+        ruta_salida = os.path.join(output_dir, f"{pid}.json")
         with open(ruta_salida, 'w', encoding='utf-8') as out:
-            json.dump(pdata, out, ensure_ascii=False, indent=2)
-        print(f"✅ Generado: {filename_json}")
+            json.dump(json_output, out, ensure_ascii=False, indent=2)
 
-    print(f"\n🎉 ¡Proceso terminado! La carpeta '{output_dir}' ya ha sido creada con los archivos JSON.")
+    print(f"\nProceso finalizado. Archivos guardados en '{output_dir}'.")
 
-if __name__ == "__main__":
-    convertir_carpeta()
+if __name__ == '__main__':
+    convertir_zip_dataset("dataset_zip")
