@@ -59,14 +59,14 @@ def procesar_archivo_a_df(filepath):
     data_rows = []
     for line in lines:
         line_str = line.strip()
-        if not line_str or any(w in line_str.lower() for w in ['time', 't(s)', 'acc', 'gyro', 'roll', 'pitch', 'yaw']):
+        # Omitir únicamente líneas vacías o de cabecera obvias
+        if not line_str or any(w in line_str.lower() for w in ['time', 't(s)', 'gyro', 'roll', 'pitch', 'yaw']):
             continue
         
         normalized = line_str.replace(',', '.')
         nums = re.findall(r'[-+]?\d*\.?\d+', normalized)
         
-        # Extracción estricta basada en las columnas requeridas:
-        # Columna 1: tiempo, Columna 2: accFrontal, Columna 3: accVertical, Columna 4: accLateral, Columna 9: etiqueta
+        # Necesitamos al menos las 4 columnas principales (Tiempo, AccFrontal, AccVertical, AccLateral)
         if len(nums) >= 4:
             try:
                 t_val = float(nums[0])   # Columna 1
@@ -74,6 +74,7 @@ def procesar_archivo_a_df(filepath):
                 ay = float(nums[2])      # Columna 3
                 az = float(nums[3])      # Columna 4
                 
+                # Columna 9 (Etiqueta si existe, de lo contrario se deduce del nombre del archivo)
                 code_raw = int(float(nums[8])) if len(nums) >= 9 else None
                 act_code, act_name = mapear_etiqueta_actividad(b_lower, code_raw)
                 
