@@ -215,4 +215,4 @@ def convertir_zip_dataset(carpeta_entrada="dataset_zip"):
 
 if __name__ == '__main__':
     # Asegúrate de que 'dataset_zip' sea la carpeta donde descomprimiste tus datasets (S1_Dataset, S2_Dataset)
-    convertir_zip_dataset("dataset_zip")
+    convertir_zip_dataset(".")
