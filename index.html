@@ -3,160 +3,67 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Análisis de Acelerometría - Muévete Conmigo y Gana</title>
-    <!-- Librerías externas -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <title>Sistema Inteligente de Actividad Física</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Chart.js para las gráficas si lo estás usando -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="app.js?v=3"></script>
-
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f3f4f6;
-            margin: 0;
-            padding: 20px;
-            color: #1f2937;
-        }
-        .main-container {
-            max-width: 1200px;
-            margin: auto;
-            background: white;
-            padding: 25px;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-        }
-        .header-section {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: #ffffff;
-            padding: 20px;
-            border-radius: 8px;
-            border: 1px solid #e5e7eb;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-            gap: 15px;
-        }
-        .logo-title-container {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-        .logo-img {
-            width: 60px;
-            height: 60px;
-            object-fit: contain;
-            border-radius: 8px;
-            background: #ffffff;
-            border: 1px solid #e5e7eb;
-        }
-        /* Contenedor transparente para cubrir el botón con el input de archivos */
-        .upload-btn-wrapper {
-            position: relative;
-            overflow: hidden;
-            display: inline-block;
-        }
-        .btn-custom {
-            background-color: #3b82f6;
-            color: white;
-            padding: 12px 24px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 14px;
-            transition: background-color 0.2s;
-        }
-        .btn-custom:hover {
-            background-color: #2563eb;
-        }
-        .upload-btn-wrapper input[type=file] {
-            font-size: 100px;
-            position: absolute;
-            left: 0;
-            top: 0;
-            opacity: 0;
-            cursor: pointer;
-            width: 100%;
-            height: 100%;
-        }
-        .content-grid {
-            display: grid;
-            grid-template-columns: 1fr 2fr;
-            gap: 20px;
-        }
-        @media (max-width: 768px) {
-            .content-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-        .card {
-            background: #f9fafb;
-            padding: 20px;
-            border-radius: 8px;
-            border: 1px solid #e5e7eb;
-        }
-        #uploadStatus {
-            font-size: 14px;
-            color: #4b5563;
-            font-weight: 500;
-        }
-    </style>
 </head>
 <body>
+    <header class="header-container">
+        <h1>Monitoreo Inteligente de Acelerometría</h1>
+        <p>Evaluación de actividad física en adultos mayores</p>
+    </header>
 
-    <div class="main-container">
-        <!-- Cabecera con Logo y Controles -->
-        <div class="header-section">
-            <div class="logo-title-container">
-                <!-- Asegúrate de que tu imagen se llame logo.jpeg o cámbialo aquí según corresponda -->
-                <img src="logo.jpeg" alt="Logo del Proyecto" class="logo-img" onerror="this.src='logo.png'">
-                <div>
-                    <h1 style="margin: 0; font-size: 22px; color: #111827;">Muévete Conmigo y Gana</h1>
-                    <span style="font-size: 13px; color: #6b7280;">Sistema Inteligente de Acelerometría</span>
-                </div>
-            </div>
+    <main class="main-content">
+        <!-- Panel de Control para la Exposición -->
+        <section class="control-panel" style="background: #f4f6f9; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
+            <label for="selectPaciente" style="font-weight: bold; margin-right: 10px;">Seleccionar Paciente (Demo):</label>
+            <select id="selectPaciente" onchange="cargarPacienteSeleccionado(this.value)" style="padding: 8px; font-size: 15px; border-radius: 4px; border: 1px solid #ccc;">
+                <option value="">-- Elige un paciente para mostrar --</option>
+                <!-- Puedes agregar más archivos JSON de tu carpeta json_convertidos -->
+                <option value="d1p01M.json">Paciente d1p01M (Masculino)</option>
+                <option value="d1p02F.json">Paciente d1p02F (Femenino)</option>
+                <option value="d2p01M.json">Paciente d2p01M (S2 - Masculino)</option>
+                <option value="d2p02F.json">Paciente d2p02F (S2 - Femenino)</option>
+            </select>
+        </section>
 
-            <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
-                <!-- Botón de carga optimizado -->
-                <div class="upload-btn-wrapper">
-                    <button class="btn-custom" type="button">Cargar Archivos (.zip, .csv, .txt)</button>
-                    <input type="file" id="fileInput" multiple accept=".zip, .csv, .txt, .txtux">
-                </div>
-                
-                <span id="uploadStatus">Ningún archivo cargado</span>
-            </div>
-        </div>
-
-        <!-- Contenido Principal -->
-        <div class="content-grid">
-            <!-- Columna Izquierda: Pacientes -->
+        <!-- Tarjetas de Resumen -->
+        <section class="dashboard-cards">
             <div class="card">
-                <h3 style="margin-top: 0; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">Pacientes</h3>
-                <div id="patientList">
-                    <p style="color: #6b7280; font-style: italic;">Carga un archivo para ver pacientes</p>
-                </div>
+                <h3>ID Paciente</h3>
+                <p id="txtId">-</p>
             </div>
-
-            <!-- Columna Derecha: Gráficas -->
             <div class="card">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                    <h3 style="margin: 0;">Visualización de Señales</h3>
-                    <select id="activityFilter" style="padding: 8px; border-radius: 6px; border: 1px solid #d1d5db;">
-                        <option value="all">Todas las actividades</option>
-                        <option value="1">Actividad 1</option>
-                        <option value="2">Actividad 2</option>
-                        <option value="3">Actividad 3</option>
-                    </select>
-                </div>
-                <div style="position: relative; height: 350px;">
-                    <canvas id="activityChart"></canvas>
-                </div>
+                <h3>Género</h3>
+                <p id="txtGenero">-</p>
             </div>
-        </div>
-    </div>
+            <div class="card">
+                <h3>Puntuación Total</h3>
+                <p id="txtScore">0 pts</p>
+            </div>
+            <div class="card">
+                <h3>Insignia Obtenida</h3>
+                <p id="txtBadge">-</p>
+            </div>
+        </section>
 
-    <!-- Script principal -->
+        <!-- Mensaje de Motivación -->
+        <section class="motivation-box" style="background: #e8f4fd; padding: 15px; border-left: 5px solid #2196F3; margin: 20px 0; border-radius: 4px;">
+            <h3>Mensaje del Sistema</h3>
+            <p id="txtMensaje">Selecciona un paciente arriba para ver el análisis en tiempo real.</p>
+        </section>
+
+        <!-- Desglose de Actividades -->
+        <section class="breakdown-section">
+            <h2>Desglose de Actividades</h2>
+            <div id="tablaDesglose" style="overflow-x: auto;">
+                <!-- Aquí se inyectará dinámicamente la tabla -->
+                <p>Sin datos cargados.</p>
+            </div>
+        </section>
+    </main>
+
     <script src="app.js"></script>
 </body>
 </html>

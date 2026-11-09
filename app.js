@@ -1,91 +1,82 @@
-// Renderizado dinámico de gráficas individuales para las 4 actividades
-const actividadesConfig = [
-    { code: 1, title: "Sentado en una cama", containerId: "chart-cama", emptyMsgId: "msg-cama" },
-    { code: 2, title: "Sentado en una silla", containerId: "chart-silla", emptyMsgId: "msg-silla" },
-    { code: 3, title: "Acostado", containerId: "chart-acostado", emptyMsgId: "msg-acostado" },
-    { code: 4, title: "Deambulando", containerId: "chart-deambulando", emptyMsgId: "msg-deambulando" }
-];
+// Función principal que se ejecuta al seleccionar un paciente en el menú desplegable
+function cargarPacienteSeleccionado(nombreArchivo) {
+    if (!nombreArchivo) return;
 
-let chartInstances = {};
+    // Ruta donde se encuentran los JSON generados por Python
+    const rutaJson = `json_convertidos/${nombreArchivo}`;
 
-function renderizarGraficasActividades(registrosReales) {
-    actividadesConfig.forEach(act => {
-        // Filtrar registros exactos asignados a la actividad actual (Cols 1, 2, 3, 4)
-        const datosFiltrados = registrosReales.filter(r => r.activityCode === act.code);
-        
-        const canvasElem = document.getElementById(act.containerId);
-        const msgElem = document.getElementById(act.emptyMsgId);
-
-        // Si la actividad no tiene registros, mostrar mensaje explícito sin generar gráfica ficticia
-        if (!datosFiltrados || datosFiltrados.length === 0) {
-            if (canvasElem) canvasElem.style.display = "none";
-            if (msgElem) {
-                msgElem.style.display = "block";
-                msgElem.innerText = `No hay datos disponibles para la actividad: ${act.title}.`;
+    fetch(rutaJson)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`No se pudo cargar el archivo: ${nombreArchivo}`);
             }
-            return;
-        }
-
-        // Si existen registros, mostrar el canvas y construir la gráfica real
-        if (canvasElem) canvasElem.style.display = "block";
-        if (msgElem) msgElem.style.display = "none";
-
-        const timestamps = datosFiltrados.map(d => d.time);
-        const accX = datosFiltrados.map(d => d.accFrontal);
-        const accY = datosFiltrados.map(d => d.accVertical);
-        const accZ = datosFiltrados.map(d => d.accLateral);
-
-        // Destruir instancia previa de Chart.js si existe
-        if (chartInstances[act.code]) {
-            chartInstances[act.code].destroy();
-        }
-
-        const ctx = canvasElem.getContext('2d');
-        chartInstances[act.code] = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: timestamps,
-                datasets: [
-                    { label: 'Acc Frontal (G)', data: accX, borderColor: '#e74c3c', fill: false, pointRadius: 1 },
-                    { label: 'Acc Vertical (G)', data: accY, borderColor: '#2ecc71', fill: false, pointRadius: 1 },
-                    { label: 'Acc Lateral (G)', data: accZ, borderColor: '#3498db', fill: false, pointRadius: 1 }
-                ]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    title: { display: true, text: `Acelerometría - ${act.title}` }
-                },
-                scales: {
-                    x: { title: { display: true, text: 'Tiempo (s)' } },
-                    y: { title: { display: true, text: 'Aceleración (G)' } }
-                }
-            }
+            return response.json();
+        })
+        .then(data => {
+            console.log("Datos del paciente cargados con éxito:", data);
+            actualizarInterfaz(data);
+        })
+        .catch(error => {
+            console.error("Error:", error);
+            alert("Asegúrate de ejecutar tu proyecto desde un servidor local (como Live Server en VS Code) para que el navegador permita leer los archivos JSON.");
         });
-    });
 }
 
-function actualizarDashboardUI(jsonData) {
-    // 1. Puntuación y Mensajes de Motivación Reales
-    document.getElementById("scoreValue").innerText = jsonData.score;
-    document.getElementById("userBadge").innerText = jsonData.badge;
-    document.getElementById("motivationText").innerText = jsonData.motivationMessage;
+// Función encargada de pintar los datos en el HTML
+function actualizarInterfaz(data) {
+    // 1. Actualizar tarjetas principales
+    document.getElementById('txtId').textContent = data.id || "N/D";
+    document.getElementById('txtGenero').textContent = data.gender || "N/D";
+    document.getElementById('txtScore').textContent = (data.score || 0) + " pts";
+    document.getElementById('txtBadge').textContent = data.badge || "Sin insignia";
 
-    // 2. Desglose de Tabla de Datos
-    const tbody = document.getElementById("tablaDesgloseBody");
-    tbody.innerHTML = "";
-    jsonData.activityBreakdown.forEach(item => {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-            <td>${item.activity}</td>
-            <td>${item.records}</td>
-            <td>${item.time}</td>
-            <td>${item.percentage}</td>
-            <td><strong>${item.points}</strong></td>
+    // 2. Actualizar mensaje de motivación
+    document.getElementById('txtMensaje').textContent = data.motivationMessage || "Sin mensajes disponibles.";
+
+    // 3. Generar la tabla de desglose de actividades
+    const contenedorTabla = document.getElementById('tablaDesglose');
+    
+    if (!data.activityBreakdown || data.activityBreakdown.length === 0) {
+        contenedorTabla.innerHTML = "<p>No hay desglose de actividades registrado para este paciente.</p>";
+        return;
+    }
+
+    let htmlTabla = `
+        <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+            <thead>
+                <tr style="background-color: #f2f2f2; text-align: left;">
+                    <th style="padding: 10px; border: 1px solid #ddd;">Actividad</th>
+                    <th style="padding: 10px; border: 1px solid #ddd;">Registros</th>
+                    <th style="padding: 10px; border: 1px solid #ddd;">Tiempo Est.</th>
+                    <th style="padding: 10px; border: 1px solid #ddd;">Porcentaje</th>
+                    <th style="padding: 10px; border: 1px solid #ddd;">Puntos</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    data.activityBreakdown.forEach(act => {
+        htmlTabla += `
+            <tr>
+                <td style="padding: 10px; border: 1px solid #ddd;">${act.activity}</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">${act.records}</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">${act.time}</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">${act.percentage}</td>
+                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; color: #2e7d32;">${act.points}</td>
+            </tr>
         `;
-        tbody.appendChild(tr);
     });
 
-    // 3. Generar Gráficas Individuales con datos correspondientes
-    renderizarGraficasActividades(jsonData.data);
+    htmlTabla += `
+            </tbody>
+        </table>
+    `;
+
+    contenedorTabla.innerHTML = htmlTabla;
 }
+
+// Opcional: Cargar automáticamente el primer paciente al abrir la página para la demo
+window.addEventListener('DOMContentLoaded', () => {
+    // Carga por defecto el primer paciente disponible para que la pantalla no luzca vacía al iniciar
+    cargarPacienteSeleccionado('d1p01M.json');
+});
