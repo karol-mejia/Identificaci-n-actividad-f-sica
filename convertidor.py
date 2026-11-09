@@ -143,14 +143,15 @@ def convertir_dataset():
     os.makedirs(output_dir, exist_ok=True)
     
     archivos = []
-    # Buscar TODOS los archivos dentro de S1_Dataset y S2_Dataset sin restricciones estrictas de nombre
-    for root, dirs, files in os.walk("."):
-        if "S1_Dataset" in root or "S2_Dataset" in root:
-            for file in files:
-                if 'readme' not in file.lower() and 'json_convertidos' not in root:
-                    archivos.append(os.path.join(root, file))
+    # Recorrer de forma absoluta S1_Dataset y S2_Dataset buscando cualquier archivo de paciente
+    for base_dir in ["S1_Dataset", "S2_Dataset"]:
+        if os.path.exists(base_dir):
+            for root, dirs, files in os.walk(base_dir):
+                for file in files:
+                    if 'readme' not in file.lower():
+                        archivos.append(os.path.join(root, file))
 
-    print(f"Total de archivos candidatos encontrados: {len(archivos)}")
+    print(f"Total de archivos encontrados en las carpetas: {len(archivos)}")
     
     todos_los_dfs = []
     archivos_procesados = []
@@ -236,6 +237,3 @@ def convertir_dataset():
             json.dump(json_output, out, ensure_ascii=False, indent=2)
 
     print(f"\n¡Proceso finalizado! Se han guardado exitosamente los archivos JSON en '{output_dir}'.")
-
-if __name__ == '__main__':
-    convertir_dataset()
