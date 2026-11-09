@@ -65,7 +65,8 @@ def procesar_archivo_a_df(filepath):
         normalized = line_str.replace(',', '.')
         nums = re.findall(r'[-+]?\d*\.?\d+', normalized)
         
-        # Mínimo 4 columnas requeridas (Col 1: t, Col 2: ax, Col 3: ay, Col 4: az)
+        # Extracción estricta basada en las columnas requeridas:
+        # Columna 1: tiempo, Columna 2: accFrontal, Columna 3: accVertical, Columna 4: accLateral, Columna 9: etiqueta
         if len(nums) >= 4:
             try:
                 t_val = float(nums[0])   # Columna 1
@@ -73,7 +74,6 @@ def procesar_archivo_a_df(filepath):
                 ay = float(nums[2])      # Columna 3
                 az = float(nums[3])      # Columna 4
                 
-                # Columna 9 (Etiqueta opcional si está presente en la fila)
                 code_raw = int(float(nums[8])) if len(nums) >= 9 else None
                 act_code, act_name = mapear_etiqueta_actividad(b_lower, code_raw)
                 
@@ -95,13 +95,11 @@ def procesar_archivo_a_df(filepath):
     return clean_filename, df
 
 def entrenar_evaluar_random_forest(df_total):
-    print("\n--- Entrenamiento del Random Forest con datos reales del ZIP ---")
+    print("\n--- Entrenamiento y Evaluación del Random Forest (Datos Reales) ---")
     
-    # Selección de columnas 2, 3 y 4 como Features (X) y columna 9 como Target (y)
     X = df_total[['accFrontal', 'accVertical', 'accLateral']]
     y = df_total['activityCode']
     
-    # División de datos (Stratified para evitar fuga de datos entre splits)
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.3, random_state=42, stratify=y
     )
@@ -137,107 +135,8 @@ def convertir_zip_dataset(carpeta_entrada="dataset_zip"):
     print(f"Archivos reales encontrados en el dataset: {len(archivos)}")
     
     todos_los_dfs = []
-    pacientes_datos = {}
-    
-    for f in archivos:
-        res = procesar_archivo_a_df(f)
-        if res:
-            p_id, df_file = res
-            todos_los_dfs.append(df_file)
-            
-            if p_id not in pacientes_datos:
-                pacientes_datos[p_id] = []
-            pacientes_datos[p_id].append(df_file)
-            
-    if not todos_los_dfs:
-        print("No se encontraron registros válidos en el ZIP.")
-        return
-    
-    df_global = pd.concat(todos_los_dfs, ignore_index=True)
-    
-    # Entrenar Random Forest globalmente con los datos extraídos del ZIP
-    modelo_rf = entrenar_evaluar_random_forest(df_global)
-    
-    # Generar JSONs por paciente con predicciones, puntuaciones y mensajes reales
-    for pid, list_dfs in pacientes_datos.items():
-        df_paciente = pd.concat(list_dfs, ignore_index=True)
-        
-        # Inferencia con Random Forest
-        X_pac = df_paciente[['accFrontal', 'accVertical', 'accLateral']]
-        df_paciente['predictedCode'] = modelo_rf.predict(X_pac)
-        
-        # Cálculo dinámico de puntuación según la actividad real identificada
-        pts_config = {1: 5, 2: 5, 3: 2, 4: 30}
-        total_records = len(df_paciente)
-        total_time_s = max(1, int(df_paciente['time'].max() - df_paciente['time'].min())) if total_records > 1 else 1
-        
-        score_total = 0
-        breakdown = []
-        
-        for code in [1, 2, 3, 4]:
-            sub_df = df_paciente[df_paciente['predictedCode'] == code]
-            rec_count = len(sub_df)
-            if rec_count > 0:
-                name_act = {1: "Sentado en una cama", 2: "Sentado en una silla", 3: "Acostado", 4: "Deambulando"}[code]
-                duration_act = int((rec_count / total_records) * total_time_s)
-                pts_act = int(duration_act * (pts_config[code] / 10.0))
-                score_total += pts_act
-                
-                breakdown.append({
-                    "code": code,
-                    "activity": name_act,
-                    "records": rec_count,
-                    "time": f"{duration_act} s",
-                    "percentage": f"{round((rec_count / total_records) * 100, 1)}%",
-                    "points": f"+{pts_act} pts"
-                })
-        
-        # Mensajes de motivación basados en resultados dinámicos reales
-        if score_total > 1000:
-            msg = "¡Excelente nivel de movimiento! Tus registros de acelerometría reflejan un gran desempeño dinámico."
-            badge = "Oro (Nivel Avanzado)"
-        elif score_total > 400:
-            msg = "Buen equilibrio de actividad física. Continúa manteniendo una rutina constante."
-            badge = "Plata (Nivel Intermedio)"
-        else:
-            msg = "Registro procesado con éxito. Se recomienda incrementar los periodos de deambulación."
-            badge = "Bronce (Nivel Iniciador)"
-
-        json_output = {
-            "id": pid,
-            "totalRecords": total_records,
-            "totalTime": f"{total_time_s} s",
-            "score": score_total,
-            "badge": badge,
-            "motivationMessage": msg,
-            "activityBreakdown": breakdown,
-            "data": df_paciente[['time', 'accFrontal', 'accVertical', 'accLateral', 'predictedCode']].rename(
-                columns={'predictedCode': 'activityCode'}
-            ).to_dict(orient='records')
-        }
-        
-        ruta_salida = os.path.join(output_dir, f"{pid}.json")
-        with open(ruta_salida, 'w', encoding='utf-8') as out:
-            json.dump(json_output, out, ensure_ascii=False, indent=2)
-
-    print(f"\nProceso finalizado. Archivos guardados en '{output_dir}'.")
-
-if __name__ == '__main__':
-    def convertir_zip_dataset(carpeta_entrada="dataset_zip"):
-    output_dir = "json_convertidos"
-    os.makedirs(output_dir, exist_ok=True)
-    
-    extensiones = ['*.txt', '*.txtux', '*.csv', '*.dat']
-    archivos = []
-    for ext in extensiones:
-        archivos.extend(glob.glob(f"{carpeta_entrada}/**/{ext}", recursive=True))
-    
-    print(f"Archivos reales encontrados en el dataset: {len(archivos)}")
-    
-    todos_los_dfs = []
     archivos_procesados = []
     
-    # 1. Procesar cada archivo de forma individual y segura
     for f in archivos:
         res = procesar_archivo_a_df(f)
         if res:
@@ -246,21 +145,19 @@ if __name__ == '__main__':
             archivos_procesados.append((p_id, df_file))
             
     if not todos_los_dfs:
-        print("No se encontraron registros válidos en el ZIP.")
+        print("No se encontraron registros válidos en las carpetas de datos.")
         return
     
     df_global = pd.concat(todos_los_dfs, ignore_index=True)
     
-    # Entrenar Random Forest globalmente con todos los datos reales del ZIP
+    # Entrenar modelo globalmente
     modelo_rf = entrenar_evaluar_random_forest(df_global)
     
-    # 2. Generar un archivo JSON independiente por cada archivo original
+    # Generar un archivo JSON independiente por cada archivo procesado
     for idx, (p_id, df_paciente) in enumerate(archivos_procesados):
-        # Inferencia con Random Forest para este archivo
         X_pac = df_paciente[['accFrontal', 'accVertical', 'accLateral']]
         df_paciente['predictedCode'] = modelo_rf.predict(X_pac)
         
-        # Cálculo dinámico de puntuación según la actividad real identificada
         pts_config = {1: 5, 2: 5, 3: 2, 4: 30}
         total_records = len(df_paciente)
         total_time_s = max(1, int(df_paciente['time'].max() - df_paciente['time'].min())) if total_records > 1 else 1
@@ -286,7 +183,6 @@ if __name__ == '__main__':
                     "points": f"+{pts_act} pts"
                 })
         
-        # Mensajes de motivación basados en resultados dinámicos reales
         if score_total > 1000:
             msg = "¡Excelente nivel de movimiento! Tus registros de acelerometría reflejan un gran desempeño dinámico."
             badge = "Oro (Nivel Avanzado)"
@@ -310,10 +206,13 @@ if __name__ == '__main__':
             ).to_dict(orient='records')
         }
         
-        # Limpiar el nombre para que sea un nombre de archivo válido
         nombre_limpio = re.sub(r'[^a-zA-Z0-9_]', '_', p_id)
         ruta_salida = os.path.join(output_dir, f"{nombre_limpio}_{idx+1}.json")
         with open(ruta_salida, 'w', encoding='utf-8') as out:
             json.dump(json_output, out, ensure_ascii=False, indent=2)
 
-    print(f"\nProceso finalizado. Se han generado múltiples archivos JSON independientes en '{output_dir}'.")
+    print(f"\n¡Proceso finalizado con éxito! Se han generado múltiples archivos JSON independientes en la carpeta '{output_dir}'.")
+
+if __name__ == '__main__':
+    # Asegúrate de que 'dataset_zip' sea la carpeta donde descomprimiste tus datasets (S1_Dataset, S2_Dataset)
+    convertir_zip_dataset("dataset_zip")
