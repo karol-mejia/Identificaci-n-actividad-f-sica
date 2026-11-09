@@ -13,7 +13,7 @@ def decodificar_texto(file_bytes):
     for enc in encodings:
         try:
             text = file_bytes.decode(enc)
-            if text and len(text.strip()) > 8:
+            if text and len(text.strip()) > 0:
                 return text
         except Exception:
             continue
@@ -26,19 +26,20 @@ def procesar_archivo_a_df(filepath):
     if 'readme' in filename.lower():
         return None
     
-    # Determinar género por el sufijo del nombre del archivo (ej. d1p01M o d2p01F)
-    genero = "Masculino" if clean_filename.upper().endswith('M') else "Femenino"
+    # Determinar género por el sufijo del nombre del archivo (M o F)
+    genero = "Masculino" if filename.upper().endswith('M') else "Femenino"
 
     try:
         with open(filepath, 'rb') as f:
             file_bytes = f.read()
-    except Exception:
+    except Exception as e:
+        print(f"  [Error al abrir] {filename}: {e}")
         return None
     
     text_data = decodificar_texto(file_bytes)
     lines = text_data.splitlines()
     
-    # Mapeo por defecto según el nombre del archivo si no hay columna 9
+    # Mapeo por defecto según el nombre del archivo
     b_lower = filename.lower()
     if 'acostad' in b_lower:
         default_code = 3
@@ -52,21 +53,25 @@ def procesar_archivo_a_df(filepath):
     data_rows = []
     for line in lines:
         line_str = line.strip()
-        if not line_str or any(w in line_str.lower() for w in ['time', 't(s)', 'acc', 'gyro', 'roll', 'pitch', 'yaw']):
+        if not line_str:
+            continue
+        
+        # Ignorar cabeceras típicas
+        if any(w in line_str.lower() for w in ['t(s)', 'gyro', 'roll', 'pitch', 'yaw']):
             continue
         
         normalized = line_str.replace(',', '.')
         nums = re.findall(r'[-+]?\d*\.?\d+', normalized)
         
-        # Seleccionar únicamente Columna 1 (tiempo), Columna 2 (accFrontal), Columna 3 (accVertical), Columna 4 (accLateral)
+        # Si la línea tiene al menos 4 números, los aprovechamos
         if len(nums) >= 4:
             try:
-                t_val = float(nums[0])   # Columna 1
-                ax = float(nums[1])      # Columna 2
-                ay = float(nums[2])      # Columna 3
-                az = float(nums[3])      # Columna 4
+                t_val = float(nums[0])   # Tiempo
+                ax = float(nums[1])      # Aceleración frontal
+                ay = float(nums[2])      # Aceleración vertical
+                az = float(nums[3])      # Aceleración lateral
                 
-                # Columna 9 (etiqueta de actividad) si existe
+                # Columna 9 (índice 8) si existe
                 act_code = default_code
                 if len(nums) >= 9:
                     try:
@@ -87,6 +92,7 @@ def procesar_archivo_a_df(filepath):
                 continue
 
     if not data_rows:
+        print(f"  [Sin datos válidos] {filename}")
         return None
     
     df = pd.DataFrame(data_rows)
@@ -97,7 +103,6 @@ def entrenar_evaluar_random_forest(df_total):
     X = df_total[['accFrontal', 'accVertical', 'accLateral']]
     y = df_total['activityCode']
     
-    # Verificar las clases únicas presentes en los datos
     clases_presentes = sorted(y.unique())
     nombres_todas_las_clases = {
         1: "Sentado en una cama (1)",
@@ -107,7 +112,6 @@ def entrenar_evaluar_random_forest(df_total):
     }
     target_names = [nombres_todas_las_clases[c] for c in clases_presentes]
     
-    # Si hay suficientes muestras para estratificar, usar stratify; de lo contrario no
     use_stratify = y if y.value_counts().min() >= 2 else None
 
     X_train, X_test, y_train, y_test = train_test_split(
@@ -120,7 +124,6 @@ def entrenar_evaluar_random_forest(df_total):
     y_pred = clf.predict(X_test)
     
     print("\n[Reporte de Clasificación]")
-    # Se especifican 'labels' y 'zero_division' para evitar errores cuando falten clases
     print(classification_report(
         y_test, 
         y_pred, 
@@ -140,14 +143,14 @@ def convertir_dataset():
     os.makedirs(output_dir, exist_ok=True)
     
     archivos = []
-    # Buscar archivos dentro de las carpetas S1_Dataset y S2_Dataset
+    # Buscar TODOS los archivos dentro de S1_Dataset y S2_Dataset sin restricciones estrictas de nombre
     for root, dirs, files in os.walk("."):
         if "S1_Dataset" in root or "S2_Dataset" in root:
             for file in files:
                 if 'readme' not in file.lower() and 'json_convertidos' not in root:
                     archivos.append(os.path.join(root, file))
 
-    print(f"Total de archivos encontrados en las carpetas: {len(archivos)}")
+    print(f"Total de archivos candidatos encontrados: {len(archivos)}")
     
     todos_los_dfs = []
     archivos_procesados = []
@@ -159,6 +162,8 @@ def convertir_dataset():
             todos_los_dfs.append(df_file)
             archivos_procesados.append((p_id, genero, df_file))
             
+    print(f"Archivos procesados con éxito: {len(archivos_procesados)}")
+    
     if not todos_los_dfs:
         print("Error: No se encontraron registros válidos.")
         return
@@ -230,7 +235,7 @@ def convertir_dataset():
         with open(ruta_salida, 'w', encoding='utf-8') as out:
             json.dump(json_output, out, ensure_ascii=False, indent=2)
 
-    print(f"\n¡Proceso finalizado con éxito! Todos los archivos JSON se han guardado en la carpeta '{output_dir}'.")
+    print(f"\n¡Proceso finalizado! Se han guardado exitosamente los archivos JSON en '{output_dir}'.")
 
 if __name__ == '__main__':
     convertir_dataset()
