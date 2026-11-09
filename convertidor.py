@@ -19,29 +19,15 @@ def decodificar_texto(file_bytes):
             continue
     return file_bytes.decode('latin-1', errors='ignore')
 
-def mapear_etiqueta_por_nombre(filename):
-    b_lower = filename.lower()
-    if 'acostad' in b_lower:
-        return 3, "Acostado"
-    elif 'silla' in b_lower or 'sentad' in b_lower:
-        return 2, "Sentado en una silla"
-    elif 'cama' in b_lower:
-        return 1, "Sentado en una cama"
-    elif any(w in b_lower for w in ['marcha', 'caminar', 'deambula']):
-        return 4, "Deambulando"
-    else:
-        return 1, "Sentado en una cama"
-
 def procesar_archivo_a_df(filepath):
     filename = os.path.basename(filepath)
     clean_filename = os.path.splitext(filename)[0]
     
-    # Determinar género por sufijo del archivo (M o F)
-    genero = "Femenino"
-    if clean_filename.upper().endswith('M'):
-        genero = "Masculino"
-    elif clean_filename.upper().endswith('F'):
-        genero = "Femenino"
+    if 'readme' in filename.lower():
+        return None
+    
+    # Determinar género por el sufijo del nombre del archivo (ej. d1p01M o d2p01F)
+    genero = "Masculino" if clean_filename.upper().endswith('M') else "Femenino"
 
     try:
         with open(filepath, 'rb') as f:
@@ -52,26 +38,35 @@ def procesar_archivo_a_df(filepath):
     text_data = decodificar_texto(file_bytes)
     lines = text_data.splitlines()
     
-    default_code, _ = mapear_etiqueta_por_nombre(filename)
-    
+    # Mapeo por defecto según el nombre del archivo si no hay columna 9
+    b_lower = filename.lower()
+    if 'acostad' in b_lower:
+        default_code = 3
+    elif 'silla' in b_lower or 'sentad' in b_lower:
+        default_code = 2
+    elif any(w in b_lower for w in ['marcha', 'caminar', 'deambula']):
+        default_code = 4
+    else:
+        default_code = 1
+
     data_rows = []
     for line in lines:
         line_str = line.strip()
-        if not line_str or any(w in line_str.lower() for w in ['time', 't(s)', 'acc', 'gyro', 'roll', 'pitch', 'yaw', 'readme']):
+        if not line_str or any(w in line_str.lower() for w in ['time', 't(s)', 'acc', 'gyro', 'roll', 'pitch', 'yaw']):
             continue
         
         normalized = line_str.replace(',', '.')
         nums = re.findall(r'[-+]?\d*\.?\d+', normalized)
         
-        # Trabajar con las columnas 1, 2, 3 y 4 (mínimo 4 valores numéricos)
+        # Seleccionar únicamente Columna 1 (tiempo), Columna 2 (accFrontal), Columna 3 (accVertical), Columna 4 (accLateral)
         if len(nums) >= 4:
             try:
-                t_val = float(nums[0])   # Columna 1: tiempo (s)
-                ax = float(nums[1])      # Columna 2: aceleración frontal (G)
-                ay = float(nums[2])      # Columna 3: aceleración vertical (G)
-                az = float(nums[3])      # Columna 4: aceleración lateral (G)
+                t_val = float(nums[0])   # Columna 1
+                ax = float(nums[1])      # Columna 2
+                ay = float(nums[2])      # Columna 3
+                az = float(nums[3])      # Columna 4
                 
-                # Columna 9 (índice 8) si está presente, de lo contrario usa la etiqueta del archivo
+                # Columna 9 (etiqueta de actividad) si existe
                 act_code = default_code
                 if len(nums) >= 9:
                     try:
@@ -92,20 +87,31 @@ def procesar_archivo_a_df(filepath):
                 continue
 
     if not data_rows:
-        print(f"Advertencia: No se extrajeron filas de {filename}")
         return None
     
     df = pd.DataFrame(data_rows)
     return clean_filename, genero, df
 
 def entrenar_evaluar_random_forest(df_total):
-    print("\n--- Entrenamiento y Evaluación del Random Forest (Columnas 2, 3, 4 y 9) ---")
-    
+    print("\n--- Entrenamiento del Random Forest con datos reales ---")
     X = df_total[['accFrontal', 'accVertical', 'accLateral']]
     y = df_total['activityCode']
     
+    # Verificar las clases únicas presentes en los datos
+    clases_presentes = sorted(y.unique())
+    nombres_todas_las_clases = {
+        1: "Sentado en una cama (1)",
+        2: "Sentado en una silla (2)",
+        3: "Acostado (3)",
+        4: "Deambulando (4)"
+    }
+    target_names = [nombres_todas_las_clases[c] for c in clases_presentes]
+    
+    # Si hay suficientes muestras para estratificar, usar stratify; de lo contrario no
+    use_stratify = y if y.value_counts().min() >= 2 else None
+
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.3, random_state=42, stratify=y
+        X, y, test_size=0.3, random_state=42, stratify=use_stratify
     )
     
     clf = RandomForestClassifier(n_estimators=100, random_state=42)
@@ -114,12 +120,14 @@ def entrenar_evaluar_random_forest(df_total):
     y_pred = clf.predict(X_test)
     
     print("\n[Reporte de Clasificación]")
-    print(classification_report(y_test, y_pred, target_names=[
-        "Sentado en una cama (1)",
-        "Sentado en una silla (2)",
-        "Acostado (3)",
-        "Deambulando (4)"
-    ]))
+    # Se especifican 'labels' y 'zero_division' para evitar errores cuando falten clases
+    print(classification_report(
+        y_test, 
+        y_pred, 
+        labels=clases_presentes, 
+        target_names=target_names, 
+        zero_division=0
+    ))
     
     print("\n[Matriz de Confusión]")
     cm = confusion_matrix(y_test, y_pred, labels=[1, 2, 3, 4])
@@ -132,14 +140,14 @@ def convertir_dataset():
     os.makedirs(output_dir, exist_ok=True)
     
     archivos = []
-    # Buscar todos los archivos dentro de S1_Dataset y S2_Dataset que no sean README
+    # Buscar archivos dentro de las carpetas S1_Dataset y S2_Dataset
     for root, dirs, files in os.walk("."):
         if "S1_Dataset" in root or "S2_Dataset" in root:
             for file in files:
-                if "readme" not in file.lower() and "json_convertidos" not in root:
+                if 'readme' not in file.lower() and 'json_convertidos' not in root:
                     archivos.append(os.path.join(root, file))
 
-    print(f"Archivos de pacientes encontrados en el dataset: {len(archivos)}")
+    print(f"Total de archivos encontrados en las carpetas: {len(archivos)}")
     
     todos_los_dfs = []
     archivos_procesados = []
@@ -152,12 +160,10 @@ def convertir_dataset():
             archivos_procesados.append((p_id, genero, df_file))
             
     if not todos_los_dfs:
-        print("No se encontraron registros válidos con las columnas requeridas.")
+        print("Error: No se encontraron registros válidos.")
         return
     
     df_global = pd.concat(todos_los_dfs, ignore_index=True)
-    
-    # Entrenar el modelo con los datos reales
     modelo_rf = entrenar_evaluar_random_forest(df_global)
     
     nombres_actividades = {
@@ -166,10 +172,8 @@ def convertir_dataset():
         3: "Acostado",
         4: "Deambulando"
     }
-    
     pts_config = {1: 5, 2: 5, 3: 2, 4: 30}
     
-    # Generar un archivo JSON independiente por cada paciente
     for p_id, genero, df_paciente in archivos_procesados:
         X_pac = df_paciente[['accFrontal', 'accVertical', 'accLateral']]
         df_paciente['predictedCode'] = modelo_rf.predict(X_pac)
@@ -222,9 +226,11 @@ def convertir_dataset():
             ).to_dict(orient='records')
         }
         
-        nombre_limpio = re.sub(r'[^a-zA-Z0-9_]', '_', p_id)
-        ruta_salida = os.path.join(output_dir, f"{nombre_limpio}.json")
+        ruta_salida = os.path.join(output_dir, f"{p_id}.json")
         with open(ruta_salida, 'w', encoding='utf-8') as out:
             json.dump(json_output, out, ensure_ascii=False, indent=2)
 
-    print(f"\n¡Proceso finalizado con éxito! Se han generado todos los archivos JSON independientes en '{output_dir}'.")
+    print(f"\n¡Proceso finalizado con éxito! Todos los archivos JSON se han guardado en la carpeta '{output_dir}'.")
+
+if __name__ == '__main__':
+    convertir_dataset()
