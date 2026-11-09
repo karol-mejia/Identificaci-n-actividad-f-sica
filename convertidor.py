@@ -19,11 +19,24 @@ def decodificar_texto(file_bytes):
             continue
     return file_bytes.decode('latin-1', errors='ignore')
 
+def mapear_etiqueta_por_nombre(filename):
+    b_lower = filename.lower()
+    if 'acostad' in b_lower:
+        return 3, "Acostado"
+    elif 'silla' in b_lower or 'sentad' in b_lower:
+        return 2, "Sentado en una silla"
+    elif 'cama' in b_lower:
+        return 1, "Sentado en una cama"
+    elif any(w in b_lower for w in ['marcha', 'caminar', 'deambula']):
+        return 4, "Deambulando"
+    else:
+        return 1, "Sentado en una cama"
+
 def procesar_archivo_a_df(filepath):
     filename = os.path.basename(filepath)
     clean_filename = os.path.splitext(filename)[0]
     
-    # Determinar el género basado en la nomenclatura del paciente (ej. d1p01M -> M = Masculino, F = Femenino)[cite: 11]
+    # Determinar género por sufijo del archivo (M o F)
     genero = "Femenino"
     if clean_filename.upper().endswith('M'):
         genero = "Masculino"
@@ -39,6 +52,8 @@ def procesar_archivo_a_df(filepath):
     text_data = decodificar_texto(file_bytes)
     lines = text_data.splitlines()
     
+    default_code, _ = mapear_etiqueta_por_nombre(filename)
+    
     data_rows = []
     for line in lines:
         line_str = line.strip()
@@ -48,28 +63,36 @@ def procesar_archivo_a_df(filepath):
         normalized = line_str.replace(',', '.')
         nums = re.findall(r'[-+]?\d*\.?\d+', normalized)
         
-        # Extracción estricta asegurando tener al menos hasta la Columna 9 (índice 8)
-        if len(nums) >= 9:
+        # Trabajar con las columnas 1, 2, 3 y 4 (mínimo 4 valores numéricos)
+        if len(nums) >= 4:
             try:
                 t_val = float(nums[0])   # Columna 1: tiempo (s)
                 ax = float(nums[1])      # Columna 2: aceleración frontal (G)
                 ay = float(nums[2])      # Columna 3: aceleración vertical (G)
                 az = float(nums[3])      # Columna 4: aceleración lateral (G)
-                act_code = int(float(nums[8])) # Columna 9: etiqueta de actividad
                 
-                # Considerar únicamente códigos de actividad válidos (1, 2, 3, 4)
-                if act_code in [1, 2, 3, 4]:
-                    data_rows.append({
-                        "time": t_val,
-                        "accFrontal": ax,
-                        "accVertical": ay,
-                        "accLateral": az,
-                        "activityCode": act_code
-                    })
+                # Columna 9 (índice 8) si está presente, de lo contrario usa la etiqueta del archivo
+                act_code = default_code
+                if len(nums) >= 9:
+                    try:
+                        val_col9 = int(float(nums[8]))
+                        if val_col9 in [1, 2, 3, 4]:
+                            act_code = val_col9
+                    except:
+                        pass
+                
+                data_rows.append({
+                    "time": t_val,
+                    "accFrontal": ax,
+                    "accVertical": ay,
+                    "accLateral": az,
+                    "activityCode": act_code
+                })
             except Exception:
                 continue
 
     if not data_rows:
+        print(f"Advertencia: No se extrajeron filas de {filename}")
         return None
     
     df = pd.DataFrame(data_rows)
@@ -108,16 +131,13 @@ def convertir_dataset():
     output_dir = "json_convertidos"
     os.makedirs(output_dir, exist_ok=True)
     
-    # Buscar archivos dentro de las carpetas estándar S1_Dataset y S2_Dataset[cite: 11]
-    extensiones = ['*.txt', '*.txtux', '*.csv', '*.dat']
     archivos = []
-    for ext in extensiones:
-        archivos.extend(glob.glob(f"**/S1_Dataset/{ext}", recursive=True))
-        archivos.extend(glob.glob(f"**/S2_Dataset/{ext}", recursive=True))
-        
-    if not archivos:
-        for ext in extensiones:
-            archivos.extend([f for f in glob.glob(f"**/{ext}", recursive=True) if 'json_convertidos' not in f and 'README' not in f.upper()])
+    # Buscar todos los archivos dentro de S1_Dataset y S2_Dataset que no sean README
+    for root, dirs, files in os.walk("."):
+        if "S1_Dataset" in root or "S2_Dataset" in root:
+            for file in files:
+                if "readme" not in file.lower() and "json_convertidos" not in root:
+                    archivos.append(os.path.join(root, file))
 
     print(f"Archivos de pacientes encontrados en el dataset: {len(archivos)}")
     
@@ -208,6 +228,3 @@ def convertir_dataset():
             json.dump(json_output, out, ensure_ascii=False, indent=2)
 
     print(f"\n¡Proceso finalizado con éxito! Se han generado todos los archivos JSON independientes en '{output_dir}'.")
-
-if __name__ == '__main__':
-    convertir_dataset()
