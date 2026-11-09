@@ -19,34 +19,17 @@ def decodificar_texto(file_bytes):
             continue
     return file_bytes.decode('latin-1', errors='ignore')
 
-def mapear_etiqueta_actividad(b_lower, code_raw=None):
-    if code_raw is not None and code_raw in [1, 2, 3, 4]:
-        mapping_codes = {
-            1: "Sentado en una cama",
-            2: "Sentado en una silla",
-            3: "Acostado",
-            4: "Deambulando"
-        }
-        return code_raw, mapping_codes[code_raw]
-    
-    if 'acostad' in b_lower:
-        return 3, "Acostado"
-    elif 'silla' in b_lower:
-        return 2, "Sentado en una silla"
-    elif 'cama' in b_lower:
-        return 1, "Sentado en una cama"
-    elif any(w in b_lower for w in ['marcha', 'caminar', 'deambula']):
-        return 4, "Deambulando"
-    elif 'sentad' in b_lower:
-        return 2, "Sentado en una silla"
-    else:
-        return 1, "Sentado en una cama"
-
 def procesar_archivo_a_df(filepath):
     filename = os.path.basename(filepath)
     clean_filename = os.path.splitext(filename)[0]
-    b_lower = filename.lower()
     
+    # Determinar el género basado en la nomenclatura del paciente (ej. d1p01M -> M = Masculino, F = Femenino)[cite: 11]
+    genero = "Femenino"
+    if clean_filename.upper().endswith('M'):
+        genero = "Masculino"
+    elif clean_filename.upper().endswith('F'):
+        genero = "Femenino"
+
     try:
         with open(filepath, 'rb') as f:
             file_bytes = f.read()
@@ -59,33 +42,30 @@ def procesar_archivo_a_df(filepath):
     data_rows = []
     for line in lines:
         line_str = line.strip()
-        # Omitir únicamente líneas vacías o de cabecera obvias
-        if not line_str or any(w in line_str.lower() for w in ['time', 't(s)', 'gyro', 'roll', 'pitch', 'yaw']):
+        if not line_str or any(w in line_str.lower() for w in ['time', 't(s)', 'acc', 'gyro', 'roll', 'pitch', 'yaw', 'readme']):
             continue
         
         normalized = line_str.replace(',', '.')
         nums = re.findall(r'[-+]?\d*\.?\d+', normalized)
         
-        # Necesitamos al menos las 4 columnas principales (Tiempo, AccFrontal, AccVertical, AccLateral)
-        if len(nums) >= 4:
+        # Extracción estricta asegurando tener al menos hasta la Columna 9 (índice 8)
+        if len(nums) >= 9:
             try:
-                t_val = float(nums[0])   # Columna 1
-                ax = float(nums[1])      # Columna 2
-                ay = float(nums[2])      # Columna 3
-                az = float(nums[3])      # Columna 4
+                t_val = float(nums[0])   # Columna 1: tiempo (s)
+                ax = float(nums[1])      # Columna 2: aceleración frontal (G)
+                ay = float(nums[2])      # Columna 3: aceleración vertical (G)
+                az = float(nums[3])      # Columna 4: aceleración lateral (G)
+                act_code = int(float(nums[8])) # Columna 9: etiqueta de actividad
                 
-                # Columna 9 (Etiqueta si existe, de lo contrario se deduce del nombre del archivo)
-                code_raw = int(float(nums[8])) if len(nums) >= 9 else None
-                act_code, act_name = mapear_etiqueta_actividad(b_lower, code_raw)
-                
-                data_rows.append({
-                    "time": t_val,
-                    "accFrontal": ax,
-                    "accVertical": ay,
-                    "accLateral": az,
-                    "activityCode": act_code,
-                    "activityName": act_name
-                })
+                # Considerar únicamente códigos de actividad válidos (1, 2, 3, 4)
+                if act_code in [1, 2, 3, 4]:
+                    data_rows.append({
+                        "time": t_val,
+                        "accFrontal": ax,
+                        "accVertical": ay,
+                        "accLateral": az,
+                        "activityCode": act_code
+                    })
             except Exception:
                 continue
 
@@ -93,10 +73,10 @@ def procesar_archivo_a_df(filepath):
         return None
     
     df = pd.DataFrame(data_rows)
-    return clean_filename, df
+    return clean_filename, genero, df
 
 def entrenar_evaluar_random_forest(df_total):
-    print("\n--- Entrenamiento y Evaluación del Random Forest (Datos Reales) ---")
+    print("\n--- Entrenamiento y Evaluación del Random Forest (Columnas 2, 3, 4 y 9) ---")
     
     X = df_total[['accFrontal', 'accVertical', 'accLateral']]
     y = df_total['activityCode']
@@ -124,16 +104,22 @@ def entrenar_evaluar_random_forest(df_total):
     
     return clf
 
-def convertir_zip_dataset(carpeta_entrada="dataset_zip"):
+def convertir_dataset():
     output_dir = "json_convertidos"
     os.makedirs(output_dir, exist_ok=True)
     
+    # Buscar archivos dentro de las carpetas estándar S1_Dataset y S2_Dataset[cite: 11]
     extensiones = ['*.txt', '*.txtux', '*.csv', '*.dat']
     archivos = []
     for ext in extensiones:
-        archivos.extend(glob.glob(f"{carpeta_entrada}/**/{ext}", recursive=True))
-    
-    print(f"Archivos reales encontrados en el dataset: {len(archivos)}")
+        archivos.extend(glob.glob(f"**/S1_Dataset/{ext}", recursive=True))
+        archivos.extend(glob.glob(f"**/S2_Dataset/{ext}", recursive=True))
+        
+    if not archivos:
+        for ext in extensiones:
+            archivos.extend([f for f in glob.glob(f"**/{ext}", recursive=True) if 'json_convertidos' not in f and 'README' not in f.upper()])
+
+    print(f"Archivos de pacientes encontrados en el dataset: {len(archivos)}")
     
     todos_los_dfs = []
     archivos_procesados = []
@@ -141,25 +127,33 @@ def convertir_zip_dataset(carpeta_entrada="dataset_zip"):
     for f in archivos:
         res = procesar_archivo_a_df(f)
         if res:
-            p_id, df_file = res
+            p_id, genero, df_file = res
             todos_los_dfs.append(df_file)
-            archivos_procesados.append((p_id, df_file))
+            archivos_procesados.append((p_id, genero, df_file))
             
     if not todos_los_dfs:
-        print("No se encontraron registros válidos en las carpetas de datos.")
+        print("No se encontraron registros válidos con las columnas requeridas.")
         return
     
     df_global = pd.concat(todos_los_dfs, ignore_index=True)
     
-    # Entrenar modelo globalmente
+    # Entrenar el modelo con los datos reales
     modelo_rf = entrenar_evaluar_random_forest(df_global)
     
-    # Generar un archivo JSON independiente por cada archivo procesado
-    for idx, (p_id, df_paciente) in enumerate(archivos_procesados):
+    nombres_actividades = {
+        1: "Sentado en una cama",
+        2: "Sentado en una silla",
+        3: "Acostado",
+        4: "Deambulando"
+    }
+    
+    pts_config = {1: 5, 2: 5, 3: 2, 4: 30}
+    
+    # Generar un archivo JSON independiente por cada paciente
+    for p_id, genero, df_paciente in archivos_procesados:
         X_pac = df_paciente[['accFrontal', 'accVertical', 'accLateral']]
         df_paciente['predictedCode'] = modelo_rf.predict(X_pac)
         
-        pts_config = {1: 5, 2: 5, 3: 2, 4: 30}
         total_records = len(df_paciente)
         total_time_s = max(1, int(df_paciente['time'].max() - df_paciente['time'].min())) if total_records > 1 else 1
         
@@ -170,7 +164,7 @@ def convertir_zip_dataset(carpeta_entrada="dataset_zip"):
             sub_df = df_paciente[df_paciente['predictedCode'] == code]
             rec_count = len(sub_df)
             if rec_count > 0:
-                name_act = {1: "Sentado en una cama", 2: "Sentado en una silla", 3: "Acostado", 4: "Deambulando"}[code]
+                name_act = nombres_actividades[code]
                 duration_act = int((rec_count / total_records) * total_time_s)
                 pts_act = int(duration_act * (pts_config[code] / 10.0))
                 score_total += pts_act
@@ -195,7 +189,8 @@ def convertir_zip_dataset(carpeta_entrada="dataset_zip"):
             badge = "Bronce (Nivel Iniciador)"
 
         json_output = {
-            "id": f"{p_id}_{idx+1}",
+            "id": p_id,
+            "gender": genero,
             "totalRecords": total_records,
             "totalTime": f"{total_time_s} s",
             "score": score_total,
@@ -208,12 +203,11 @@ def convertir_zip_dataset(carpeta_entrada="dataset_zip"):
         }
         
         nombre_limpio = re.sub(r'[^a-zA-Z0-9_]', '_', p_id)
-        ruta_salida = os.path.join(output_dir, f"{nombre_limpio}_{idx+1}.json")
+        ruta_salida = os.path.join(output_dir, f"{nombre_limpio}.json")
         with open(ruta_salida, 'w', encoding='utf-8') as out:
             json.dump(json_output, out, ensure_ascii=False, indent=2)
 
-    print(f"\n¡Proceso finalizado con éxito! Se han generado múltiples archivos JSON independientes en la carpeta '{output_dir}'.")
+    print(f"\n¡Proceso finalizado con éxito! Se han generado todos los archivos JSON independientes en '{output_dir}'.")
 
 if __name__ == '__main__':
-    # Asegúrate de que 'dataset_zip' sea la carpeta donde descomprimiste tus datasets (S1_Dataset, S2_Dataset)
-    convertir_zip_dataset(".")
+    convertir_dataset()
