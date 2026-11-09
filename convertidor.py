@@ -223,4 +223,97 @@ def convertir_zip_dataset(carpeta_entrada="dataset_zip"):
     print(f"\nProceso finalizado. Archivos guardados en '{output_dir}'.")
 
 if __name__ == '__main__':
-    convertir_zip_dataset("dataset_zip")
+    def convertir_zip_dataset(carpeta_entrada="dataset_zip"):
+    output_dir = "json_convertidos"
+    os.makedirs(output_dir, exist_ok=True)
+    
+    extensiones = ['*.txt', '*.txtux', '*.csv', '*.dat']
+    archivos = []
+    for ext in extensiones:
+        archivos.extend(glob.glob(f"{carpeta_entrada}/**/{ext}", recursive=True))
+    
+    print(f"Archivos reales encontrados en el dataset: {len(archivos)}")
+    
+    todos_los_dfs = []
+    archivos_procesados = []
+    
+    # 1. Procesar cada archivo de forma individual y segura
+    for f in archivos:
+        res = procesar_archivo_a_df(f)
+        if res:
+            p_id, df_file = res
+            todos_los_dfs.append(df_file)
+            archivos_procesados.append((p_id, df_file))
+            
+    if not todos_los_dfs:
+        print("No se encontraron registros válidos en el ZIP.")
+        return
+    
+    df_global = pd.concat(todos_los_dfs, ignore_index=True)
+    
+    # Entrenar Random Forest globalmente con todos los datos reales del ZIP
+    modelo_rf = entrenar_evaluar_random_forest(df_global)
+    
+    # 2. Generar un archivo JSON independiente por cada archivo original
+    for idx, (p_id, df_paciente) in enumerate(archivos_procesados):
+        # Inferencia con Random Forest para este archivo
+        X_pac = df_paciente[['accFrontal', 'accVertical', 'accLateral']]
+        df_paciente['predictedCode'] = modelo_rf.predict(X_pac)
+        
+        # Cálculo dinámico de puntuación según la actividad real identificada
+        pts_config = {1: 5, 2: 5, 3: 2, 4: 30}
+        total_records = len(df_paciente)
+        total_time_s = max(1, int(df_paciente['time'].max() - df_paciente['time'].min())) if total_records > 1 else 1
+        
+        score_total = 0
+        breakdown = []
+        
+        for code in [1, 2, 3, 4]:
+            sub_df = df_paciente[df_paciente['predictedCode'] == code]
+            rec_count = len(sub_df)
+            if rec_count > 0:
+                name_act = {1: "Sentado en una cama", 2: "Sentado en una silla", 3: "Acostado", 4: "Deambulando"}[code]
+                duration_act = int((rec_count / total_records) * total_time_s)
+                pts_act = int(duration_act * (pts_config[code] / 10.0))
+                score_total += pts_act
+                
+                breakdown.append({
+                    "code": code,
+                    "activity": name_act,
+                    "records": rec_count,
+                    "time": f"{duration_act} s",
+                    "percentage": f"{round((rec_count / total_records) * 100, 1)}%",
+                    "points": f"+{pts_act} pts"
+                })
+        
+        # Mensajes de motivación basados en resultados dinámicos reales
+        if score_total > 1000:
+            msg = "¡Excelente nivel de movimiento! Tus registros de acelerometría reflejan un gran desempeño dinámico."
+            badge = "Oro (Nivel Avanzado)"
+        elif score_total > 400:
+            msg = "Buen equilibrio de actividad física. Continúa manteniendo una rutina constante."
+            badge = "Plata (Nivel Intermedio)"
+        else:
+            msg = "Registro procesado con éxito. Se recomienda incrementar los periodos de deambulación."
+            badge = "Bronce (Nivel Iniciador)"
+
+        json_output = {
+            "id": f"{p_id}_{idx+1}",
+            "totalRecords": total_records,
+            "totalTime": f"{total_time_s} s",
+            "score": score_total,
+            "badge": badge,
+            "motivationMessage": msg,
+            "activityBreakdown": breakdown,
+            "data": df_paciente[['time', 'accFrontal', 'accVertical', 'accLateral', 'predictedCode']].rename(
+                columns={'predictedCode': 'activityCode'}
+            ).to_dict(orient='records')
+        }
+        
+        # Limpiar el nombre para que sea un nombre de archivo válido
+        nombre_limpio = re.sub(r'[^a-zA-Z0-9_]', '_', p_id)
+        ruta_salida = os.path.join(output_dir, f"{nombre_limpio}_{idx+1}.json")
+        with open(ruta_salida, 'w', encoding='utf-8') as out:
+            json.dump(json_output, out, ensure_ascii=False, indent=2)
+
+    print(f"\nProceso finalizado. Se han generado múltiples archivos JSON independientes en '{output_dir}'.")
