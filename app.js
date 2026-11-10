@@ -46,27 +46,40 @@ function cargarArchivoManual(event) {
 }
 
 // Descomprimir y leer el .ZIP automáticamente
+// Descomprimir y leer el .ZIP automáticamente (Compatible con cualquier estructura interna)
 function procesarArchivoZip(archivoZip) {
     JSZip.loadAsync(archivoZip).then(function(zip) {
         let promesas = [];
+        let listaDatos = [];
+
         zip.forEach(function (relativePath, zipEntry) {
-            if (!zipEntry.dir && relativePath.endsWith('.json')) {
+            // Ignorar carpetas y archivos que no sean .json (o archivos ocultos del sistema como __MACOSX)
+            if (!zipEntry.dir && relativePath.endsWith('.json') && !relativePath.includes('__MACOSX')) {
                 promesas.push(
                     zipEntry.async("string").then(function(content) {
-                        return JSON.parse(content);
+                        try {
+                            const data = JSON.parse(content);
+                            listaDatos.push(data);
+                        } catch (e) {
+                            console.error("Error al parsear JSON interno:", relativePath);
+                        }
                     })
                 );
             }
         });
 
-        Promise.all(promesas).then(listaDatos => {
-            agregarPacientesAlMenu(listaDatos);
+        Promise.all(promesas).then(() => {
+            if (listaDatos.length > 0) {
+                agregarPacientesAlMenu(listaDatos);
+            } else {
+                alert("No se encontraron archivos .json válidos dentro del archivo ZIP.");
+            }
         }).catch(err => {
-            alert("Error al descomprimir o procesar los archivos JSON dentro del .ZIP");
+            console.error("Error en promesas del ZIP:", err);
+            alert("Error al procesar los archivos dentro del .ZIP");
         });
     });
 }
-
 // Procesar lista de archivos seleccionados
 function procesarListaArchivos(listaArchivos) {
     let promesas = [];
