@@ -107,7 +107,7 @@ def entrenar_evaluar_random_forest(df_total):
     nombres_todas_las_clases = {
         1: "Sentado en una cama (1)",
         2: "Sentado en una silla (2)",
-        3: "Acostado (3)",
+        3: "Acostado en la cama (3)",
         4: "Deambulando (4)"
     }
     target_names = [nombres_todas_las_clases[c] for c in clases_presentes]
@@ -173,10 +173,10 @@ def convertir_dataset():
     modelo_rf = entrenar_evaluar_random_forest(df_global)
     
     nombres_actividades = {
-        1: "Sentado en una cama",
-        2: "Sentado en una silla",
-        3: "Acostado",
-        4: "Deambulando"
+        1: "Sentado en la cama",
+        2: "Sentado en la silla",
+        3: "Acostado en la cama",
+        4: "Deambulando (incluye estar de pie y caminar)"
     }
     pts_config = {1: 5, 2: 5, 3: 2, 4: 30}
     
