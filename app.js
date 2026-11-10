@@ -1,4 +1,4 @@
-// Base de datos local de respaldo para la exposición en GitHub Pages
+// Base de datos de demostración instantánea
 const pacientesDemo = {
     "d1p01M.json": {
         "id": "d1p01M",
@@ -32,32 +32,7 @@ const pacientesDemo = {
     }
 };
 
-// 1. Cargar mediante el menú desplegable (Usa la base integrada o busca el archivo)
-function cargarPacienteSeleccionado(nombreArchivo) {
-    if (!nombreArchivo) return;
-
-    // Si el paciente está en nuestra demo interna, lo carga al instante sin errores de red
-    if (pacientesDemo[nombreArchivo]) {
-        console.log("Cargando datos de demostración para:", nombreArchivo);
-        actualizarInterfaz(pacientesDemo[nombreArchivo]);
-        return;
-    }
-
-    // Si intenta buscar el archivo externo por fetch
-    const rutaJson = `json_convertidos/${nombreArchivo}`;
-    fetch(rutaJson)
-        .then(response => {
-            if (!response.ok) throw new Error("No encontrado");
-            return response.json();
-        })
-        .then(data => actualizarInterfaz(data))
-        .catch(error => {
-            console.error("Error:", error);
-            alert("Verifica que el archivo JSON exista en tu repositorio de GitHub.");
-        });
-}
-
-// 2. Cargar mediante el botón de subir archivo manual
+// 1. CARGA MANUAL DE CUALQUIER ARCHIVO JSON DESDE TU COMPUTADORA
 function cargarArchivoManual(event) {
     const archivo = event.target.files[0];
     if (!archivo) return;
@@ -66,39 +41,54 @@ function cargarArchivoManual(event) {
     lector.onload = function(e) {
         try {
             const data = JSON.parse(e.target.result);
+            console.log("Archivo JSON cargado manualmente:", data);
             actualizarInterfaz(data);
         } catch (error) {
-            alert("El archivo seleccionado no tiene un formato JSON válido.");
+            console.error("Error al leer JSON:", error);
+            alert("El archivo seleccionado no es un JSON válido generado por el script.");
         }
     };
     lector.readAsText(archivo);
 }
 
-// 3. Función unificada para actualizar los elementos visuales de la interfaz
+// 2. CARGA DESDE EL SELECTOR DE DEMO
+function cargarPacienteSeleccionado(nombreArchivo) {
+    if (!nombreArchivo) return;
+
+    if (pacientesDemo[nombreArchivo]) {
+        actualizarInterfaz(pacientesDemo[nombreArchivo]);
+    } else {
+        fetch(`json_convertidos/${nombreArchivo}`)
+            .then(res => res.json())
+            .then(data => actualizarInterfaz(data))
+            .catch(err => alert("No se pudo encontrar el archivo en la carpeta local."));
+    }
+}
+
+// 3. ACTUALIZACIÓN VISUAL DE LA INTERFAZ
 function actualizarInterfaz(data) {
     document.getElementById('txtId').textContent = data.id || "N/D";
     document.getElementById('txtGenero').textContent = data.gender || "N/D";
     document.getElementById('txtScore').textContent = (data.score || 0) + " pts";
     document.getElementById('txtBadge').textContent = data.badge || "Sin insignia";
-
-    document.getElementById('txtMensaje').textContent = data.motivationMessage || "Sin mensajes disponibles.";
+    document.getElementById('txtMensaje').textContent = data.motivationMessage || "Sin mensaje.";
 
     const contenedorTabla = document.getElementById('tablaDesglose');
     
     if (!data.activityBreakdown || data.activityBreakdown.length === 0) {
-        contenedorTabla.innerHTML = "<p style='color: #666;'>No hay registros de actividad para este paciente.</p>";
+        contenedorTabla.innerHTML = "<p style='color: #64748b; padding: 10px 0;'>No se encontraron parámetros de actividad en este archivo.</p>";
         return;
     }
 
     let htmlTabla = `
-        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 10px;">
             <thead>
-                <tr style="background-color: #f1f3f5; text-align: left; color: #495057;">
-                    <th style="padding: 12px; border-bottom: 2px solid #dee2e6;">Parámetro de Actividad</th>
-                    <th style="padding: 12px; border-bottom: 2px solid #dee2e6;">Registros</th>
-                    <th style="padding: 12px; border-bottom: 2px solid #dee2e6;">Tiempo Estimado</th>
-                    <th style="padding: 12px; border-bottom: 2px solid #dee2e6;">Porcentaje</th>
-                    <th style="padding: 12px; border-bottom: 2px solid #dee2e6;">Puntuación</th>
+                <tr style="background-color: #f8fafc; text-align: left; color: #475569;">
+                    <th style="padding: 12px; border-bottom: 2px solid #e2e8f0;">Parámetro de Actividad</th>
+                    <th style="padding: 12px; border-bottom: 2px solid #e2e8f0;">Registros</th>
+                    <th style="padding: 12px; border-bottom: 2px solid #e2e8f0;">Tiempo Est.</th>
+                    <th style="padding: 12px; border-bottom: 2px solid #e2e8f0;">Porcentaje</th>
+                    <th style="padding: 12px; border-bottom: 2px solid #e2e8f0;">Puntuación</th>
                 </tr>
             </thead>
             <tbody>
@@ -106,25 +96,21 @@ function actualizarInterfaz(data) {
 
     data.activityBreakdown.forEach(act => {
         htmlTabla += `
-            <tr style="border-bottom: 1px solid #f1f3f5;">
-                <td style="padding: 12px; font-weight: 500; color: #212529;">${act.activity}</td>
-                <td style="padding: 12px; color: #495057;">${act.records}</td>
-                <td style="padding: 12px; color: #495057;">${act.time}</td>
-                <td style="padding: 12px; color: #495057;">${act.percentage}</td>
-                <td style="padding: 12px; font-weight: bold; color: #27ae60;">${act.points}</td>
+            <tr style="border-bottom: 1px solid #f1f5f9;">
+                <td style="padding: 12px; font-weight: 500; color: #1e293b;">${act.activity}</td>
+                <td style="padding: 12px; color: #475569;">${act.records}</td>
+                <td style="padding: 12px; color: #475569;">${act.time}</td>
+                <td style="padding: 12px; color: #475569;">${act.percentage}</td>
+                <td style="padding: 12px; font-weight: bold; color: #16a34a;">${act.points}</td>
             </tr>
         `;
     });
 
-    htmlTabla += `
-            </tbody>
-        </table>
-    `;
-
+    htmlTabla += `</tbody></table>`;
     contenedorTabla.innerHTML = htmlTabla;
 }
 
-// Cargar por defecto el primer paciente al abrir la página
+// Cargar primer paciente por defecto al iniciar la página
 window.addEventListener('DOMContentLoaded', () => {
     cargarPacienteSeleccionado('d1p01M.json');
 });
