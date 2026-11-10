@@ -8,24 +8,40 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-    <header class="header-container" style="text-align: center; padding: 20px; background: #2c3e50; color: white;">
-        <h1>Sistema Inteligente de Promoción de Actividad Física</h1>
-        <p>Análisis de Acelerometría y Clasificación con Machine Learning (Random Forest)</p>
+    <header class="header-container" style="display: flex; align-items: center; justify-content: space-between; padding: 15px 30px; background: #2c3e50; color: white; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <!-- Logo del proyecto -->
+            <img src="logo.jpeg" alt="Logo Proyecto" style="height: 55px; width: 55px; border-radius: 50%; object-fit: cover; border: 2px solid white;">
+            <div>
+                <h1 style="margin: 0; font-size: 20px;">Sistema Inteligente de Promoción de Actividad Física</h1>
+                <p style="margin: 0; font-size: 13px; color: #cbd5e1;">Análisis de Acelerometría y Machine Learning (Random Forest)</p>
+            </div>
+        </div>
     </header>
 
     <main class="main-content" style="max-width: 1000px; margin: 20px auto; padding: 0 20px;">
         
-        <!-- Panel de Demostración para la Exposición -->
-        <section class="control-panel" style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center; border: 1px solid #dee2e6;">
-            <label for="selectPaciente" style="font-weight: bold; margin-right: 10px; color: #333;">Seleccionar Paciente (Demo Exposición):</label>
-            <select id="selectPaciente" onchange="cargarPacienteSeleccionado(this.value)" style="padding: 8px; font-size: 15px; border-radius: 4px; border: 1px solid #ccc;">
-                <option value="">-- Elige un paciente --</option>
-                <!-- Asegúrate de que estos archivos existan en tu carpeta json_convertidos -->
-                <option value="d1p01M.json">Paciente d1p01M (Masculino)</option>
-                <option value="d1p02F.json">Paciente d1p02F (Femenino)</option>
-                <option value="d2p01M.json">Paciente d2p01M (S2 - Masculino)</option>
-                <option value="d2p02F.json">Paciente d2p02F (S2 - Femenino)</option>
-            </select>
+        <!-- Panel de Control (Selector de guardados + Subida manual) -->
+        <section class="control-panel" style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; justify-content: space-around; align-items: center; flex-wrap: wrap; gap: 15px; border: 1px solid #dee2e6;">
+            
+            <!-- Opción A: Selector de pacientes guardados (Para la Demo) -->
+            <div>
+                <label for="selectPaciente" style="font-weight: bold; margin-right: 8px; color: #333; font-size: 14px;">Seleccionar Paciente (Demo):</label>
+                <select id="selectPaciente" onchange="cargarPacienteSeleccionado(this.value)" style="padding: 8px; font-size: 14px; border-radius: 4px; border: 1px solid #ccc;">
+                    <option value="">-- Elige un paciente --</option>
+                    <option value="d1p01M.json">Paciente d1p01M (Masculino)</option>
+                    <option value="d1p02F.json">Paciente d1p02F (Femenino)</option>
+                    <option value="d2p01M.json">Paciente d2p01M (S2 - Masculino)</option>
+                    <option value="d2p02F.json">Paciente d2p02F (S2 - Femenino)</option>
+                </select>
+            </div>
+
+            <!-- Opción B: Botón para subir archivo JSON manual -->
+            <div>
+                <label for="fileInput" style="font-weight: bold; margin-right: 8px; color: #333; font-size: 14px;">O subir archivo:</label>
+                <input type="file" id="fileInput" accept=".json" onchange="cargarArchivoManual(event)" style="font-size: 14px;">
+            </div>
+
         </section>
 
         <!-- Tarjetas de Resumen del Paciente -->
@@ -51,7 +67,7 @@
         <!-- Caja de Retroalimentación y Motivación -->
         <section class="motivation-box" style="background: #e8f4fd; padding: 15px; border-left: 5px solid #2980b9; margin-bottom: 20px; border-radius: 4px;">
             <h3 style="margin: 0 0 5px 0; color: #2980b9;">Mensaje del Sistema Inteligente</h3>
-            <p id="txtMensaje" style="margin: 0; color: #333;">Selecciona un paciente en el menú superior para ver su evaluación kinemática y de movilidad.</p>
+            <p id="txtMensaje" style="margin: 0; color: #333;">Selecciona un paciente o sube un archivo JSON para ver su evaluación kinemática.</p>
         </section>
 
         <!-- Desglose de Parámetros de Actividad -->

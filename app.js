@@ -1,14 +1,13 @@
-// Función para cargar los datos del paciente seleccionado desde la carpeta json_convertidos/
+// 1. Cargar mediante el menú desplegable (para la exposición rápida)
 function cargarPacienteSeleccionado(nombreArchivo) {
     if (!nombreArchivo) return;
 
-    // Ruta relativa limpia ideal para GitHub Pages
     const rutaJson = `json_convertidos/${nombreArchivo}`;
 
     fetch(rutaJson)
         .then(response => {
             if (!response.ok) {
-                throw new Error(`No se pudo encontrar el archivo del paciente: ${nombreArchivo}`);
+                throw new Error(`No se pudo encontrar el archivo: ${nombreArchivo}`);
             }
             return response.json();
         })
@@ -18,22 +17,38 @@ function cargarPacienteSeleccionado(nombreArchivo) {
         })
         .catch(error => {
             console.error("Error al cargar el JSON:", error);
-            alert("Verifica que el archivo JSON exista dentro de la carpeta 'json_convertidos' en tu repositorio.");
+            alert("Verifica que el archivo JSON esté dentro de la carpeta 'json_convertidos'.");
         });
 }
 
-// Función encargada de actualizar los elementos visuales de la interfaz web
+// 2. Cargar mediante el botón de subir archivo manual
+function cargarArchivoManual(event) {
+    const archivo = event.target.files[0];
+    if (!archivo) return;
+
+    const lector = new FileReader();
+    lector.onload = function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+            console.log("Archivo subido manualmente con éxito:", data);
+            actualizarInterfaz(data);
+        } catch (error) {
+            console.error("Error al parsear el JSON:", error);
+            alert("El archivo seleccionado no tiene un formato JSON válido.");
+        }
+    };
+    lector.readAsText(archivo);
+}
+
+// 3. Función unificada para actualizar los elementos visuales de la interfaz
 function actualizarInterfaz(data) {
-    // 1. Tarjetas principales
     document.getElementById('txtId').textContent = data.id || "N/D";
     document.getElementById('txtGenero').textContent = data.gender || "N/D";
     document.getElementById('txtScore').textContent = (data.score || 0) + " pts";
     document.getElementById('txtBadge').textContent = data.badge || "Sin insignia";
 
-    // 2. Mensaje motivacional
     document.getElementById('txtMensaje').textContent = data.motivationMessage || "Sin mensajes disponibles.";
 
-    // 3. Renderizar tabla con los parámetros de actividad definidos
     const contenedorTabla = document.getElementById('tablaDesglose');
     
     if (!data.activityBreakdown || data.activityBreakdown.length === 0) {
@@ -75,7 +90,7 @@ function actualizarInterfaz(data) {
     contenedorTabla.innerHTML = htmlTabla;
 }
 
-// Cargar automáticamente el primer paciente por defecto al abrir la página en la web
+// Cargar por defecto el primer paciente al abrir la página
 window.addEventListener('DOMContentLoaded', () => {
     cargarPacienteSeleccionado('d1p01M.json');
 });
