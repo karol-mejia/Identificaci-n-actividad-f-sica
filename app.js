@@ -1,4 +1,3 @@
-// Base de datos de demostración interna y dinámica
 let pacientesDemo = {
     "d1p01M.json": {
         "id": "d1p01M",
@@ -32,76 +31,107 @@ let pacientesDemo = {
     }
 };
 
-// 1. CARGA MÚLTIPLE DE ARCHIVOS JSON MANUALES
+// MANEJADOR DE CARGA DE ARCHIVOS (.JSON, .ZIP O CARPETAS)
 function cargarArchivoManual(event) {
     const archivos = event.target.files;
     if (!archivos || archivos.length === 0) return;
 
-    const selectPaciente = document.getElementById('selectPaciente');
-    let primerDatos = null;
-
-    // Recorrer cada archivo seleccionado en lote
-    Array.from(archivos).forEach((archivo, index) => {
-        const lector = new FileReader();
-        lector.onload = function(e) {
-            try {
-                const data = JSON.parse(e.target.result);
-                const keyName = `${data.id || 'paciente_' + index}.json`;
-                
-                // Guardarlo en la memoria temporal de pacientes
-                pacientesDemo[keyName] = data;
-
-                // Verificar si ya existe en el menú desplegable para no repetirlo
-                let existeEnSelect = false;
-                for (let i = 0; i < selectPaciente.options.length; i++) {
-                    if (selectPaciente.options[i].value === keyName) {
-                        existeEnSelect = true;
-                        break;
-                    }
-                }
-
-                // Si no está en el menú, agregarlo dinámicamente
-                if (!existeEnSelect) {
-                    const nuevaOpcion = document.createElement('option');
-                    nuevaOpcion.value = keyName;
-                    nuevaOpcion.textContent = `Paciente ${data.id} (${data.gender || 'N/D'})`;
-                    selectPaciente.appendChild(nuevaOpcion);
-                }
-
-                // Guardar el primero para mostrarlo en pantalla de inmediato
-                if (index === 0) {
-                    primerDatos = data;
-                    actualizarInterfaz(primerDatos);
-                    selectPaciente.value = keyName; // Seleccionarlo en el menú
-                }
-            } catch (error) {
-                console.error("Error al procesar el archivo JSON:", error);
-            }
-        };
-        lector.readAsText(archivo);
-    });
-
-    console.log(`Se procesaron ${archivos.length} archivos correctamente.`);
-}
-
-// 2. CARGA DESDE EL SELECTOR DE DEMO
-function cargarPacienteSeleccionado(nombreArchivo) {
-    if (!nombreArchivo) return;
-
-    if (pacientesDemo[nombreArchivo]) {
-        actualizarInterfaz(pacientesDemo[nombreArchivo]);
+    // Si el usuario subió un archivo .ZIP
+    if (archivos.length === 1 && archivos[0].name.endsWith('.zip')) {
+        procesarArchivoZip(archivos[0]);
     } else {
-        fetch(`json_convertidos/${nombreArchivo}`)
-            .then(res => {
-                if (!res.ok) throw new Error("No encontrado");
-                return res.json();
-            })
-            .then(data => actualizarInterfaz(data))
-            .catch(err => alert("No se pudo encontrar el archivo."));
+        // Procesar carpeta o selección múltiple de JSONs
+        procesarListaArchivos(Array.from(archivos));
     }
 }
 
-// 3. ACTUALIZACIÓN VISUAL DE LA INTERFAZ
+// Descomprimir y leer el .ZIP automáticamente
+function procesarArchivoZip(archivoZip) {
+    JSZip.loadAsync(archivoZip).then(function(zip) {
+        let promesas = [];
+        zip.forEach(function (relativePath, zipEntry) {
+            if (!zipEntry.dir && relativePath.endsWith('.json')) {
+                promesas.push(
+                    zipEntry.async("string").then(function(content) {
+                        return JSON.parse(content);
+                    })
+                );
+            }
+        });
+
+        Promise.all(promesas).then(listaDatos => {
+            agregarPacientesAlMenu(listaDatos);
+        }).catch(err => {
+            alert("Error al descomprimir o procesar los archivos JSON dentro del .ZIP");
+        });
+    });
+}
+
+// Procesar lista de archivos seleccionados
+function procesarListaArchivos(listaArchivos) {
+    let promesas = [];
+
+    listaArchivos.forEach(archivo => {
+        if (archivo.name.endsWith('.json')) {
+            promesas.push(new Promise((resolve) => {
+                const lector = new FileReader();
+                lector.onload = e => {
+                    try {
+                        resolve(JSON.parse(e.target.result));
+                    } catch (err) {
+                        resolve(null);
+                    }
+                };
+                lector.readAsText(archivo);
+            }));
+        }
+    });
+
+    Promise.all(promesas).then(listaDatos => {
+        const filtrados = listaDatos.filter(d => d !== null);
+        agregarPacientesAlMenu(filtrados);
+    });
+}
+
+// Registrar todos los pacientes procesados en la interfaz
+function agregarPacientesAlMenu(listaDatos) {
+    if (listaDatos.length === 0) return;
+
+    const selectPaciente = document.getElementById('selectPaciente');
+
+    listaDatos.forEach((data, index) => {
+        const keyName = `${data.id || 'paciente_' + index}.json`;
+        pacientesDemo[keyName] = data;
+
+        let existe = false;
+        for (let i = 0; i < selectPaciente.options.length; i++) {
+            if (selectPaciente.options[i].value === keyName) {
+                existe = true;
+                break;
+            }
+        }
+
+        if (!existe) {
+            const op = document.createElement('option');
+            op.value = keyName;
+            op.textContent = `Paciente ${data.id} (${data.gender || 'N/D'})`;
+            selectPaciente.appendChild(op);
+        }
+    });
+
+    // Cargar y mostrar el primer paciente de la lista procesada
+    actualizarInterfaz(listaDatos[0]);
+    selectPaciente.value = `${listaDatos[0].id}.json`;
+    alert(`¡Éxito! Se cargaron ${listaDatos.length} pacientes al menú desplegable.`);
+}
+
+function cargarPacienteSeleccionado(nombreArchivo) {
+    if (!nombreArchivo) return;
+    if (pacientesDemo[nombreArchivo]) {
+        actualizarInterfaz(pacientesDemo[nombreArchivo]);
+    }
+}
+
 function actualizarInterfaz(data) {
     document.getElementById('txtId').textContent = data.id || "N/D";
     document.getElementById('txtGenero').textContent = data.gender || "N/D";
@@ -112,7 +142,7 @@ function actualizarInterfaz(data) {
     const contenedorTabla = document.getElementById('tablaDesglose');
     
     if (!data.activityBreakdown || data.activityBreakdown.length === 0) {
-        contenedorTabla.innerHTML = "<p style='color: #64748b; padding: 10px 0;'>No se encontraron parámetros de actividad en este archivo.</p>";
+        contenedorTabla.innerHTML = "<p style='color: #64748b; padding: 10px 0;'>No se encontraron parámetros de actividad.</p>";
         return;
     }
 
@@ -146,7 +176,6 @@ function actualizarInterfaz(data) {
     contenedorTabla.innerHTML = htmlTabla;
 }
 
-// Cargar primer paciente por defecto al iniciar la página
 window.addEventListener('DOMContentLoaded', () => {
     cargarPacienteSeleccionado('d1p01M.json');
 });
