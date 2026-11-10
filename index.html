@@ -30,7 +30,7 @@
             <!-- Cargar archivos, carpetas o .ZIP -->
             <div style="flex: 1; min-width: 250px;">
                 <label style="display: block; font-weight: bold; margin-bottom: 5px; color: #2c3e50; font-size: 14px;">📁 Cargar pacientes (archivos .json, .zip o carpeta):</label>
-                <input type="file" id="fileInput" accept=".json,.zip" multiple webkitdirectory directory onchange="cargarArchivoManual(event)" style="width: 100%; padding: 6px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; background: #fafafa;">
+                <input type="file" id="fileInput" accept=".json,.zip" multiple onchange="cargarArchivoManual(event)" style="width: 100%; padding: 6px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; background: #fafafa;">
             </div>
 
             <!-- Seleccionar de la lista precargada -->
