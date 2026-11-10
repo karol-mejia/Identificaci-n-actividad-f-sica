@@ -1,5 +1,5 @@
-// Base de datos de demostración instantánea
-const pacientesDemo = {
+// Base de datos de demostración interna y dinámica
+let pacientesDemo = {
     "d1p01M.json": {
         "id": "d1p01M",
         "gender": "Masculino",
@@ -32,23 +32,56 @@ const pacientesDemo = {
     }
 };
 
-// 1. CARGA MANUAL DE CUALQUIER ARCHIVO JSON DESDE TU COMPUTADORA
+// 1. CARGA MÚLTIPLE DE ARCHIVOS JSON MANUALES
 function cargarArchivoManual(event) {
-    const archivo = event.target.files[0];
-    if (!archivo) return;
+    const archivos = event.target.files;
+    if (!archivos || archivos.length === 0) return;
 
-    const lector = new FileReader();
-    lector.onload = function(e) {
-        try {
-            const data = JSON.parse(e.target.result);
-            console.log("Archivo JSON cargado manualmente:", data);
-            actualizarInterfaz(data);
-        } catch (error) {
-            console.error("Error al leer JSON:", error);
-            alert("El archivo seleccionado no es un JSON válido generado por el script.");
-        }
-    };
-    lector.readAsText(archivo);
+    const selectPaciente = document.getElementById('selectPaciente');
+    let primerDatos = null;
+
+    // Recorrer cada archivo seleccionado en lote
+    Array.from(archivos).forEach((archivo, index) => {
+        const lector = new FileReader();
+        lector.onload = function(e) {
+            try {
+                const data = JSON.parse(e.target.result);
+                const keyName = `${data.id || 'paciente_' + index}.json`;
+                
+                // Guardarlo en la memoria temporal de pacientes
+                pacientesDemo[keyName] = data;
+
+                // Verificar si ya existe en el menú desplegable para no repetirlo
+                let existeEnSelect = false;
+                for (let i = 0; i < selectPaciente.options.length; i++) {
+                    if (selectPaciente.options[i].value === keyName) {
+                        existeEnSelect = true;
+                        break;
+                    }
+                }
+
+                // Si no está en el menú, agregarlo dinámicamente
+                if (!existeEnSelect) {
+                    const nuevaOpcion = document.createElement('option');
+                    nuevaOpcion.value = keyName;
+                    nuevaOpcion.textContent = `Paciente ${data.id} (${data.gender || 'N/D'})`;
+                    selectPaciente.appendChild(nuevaOpcion);
+                }
+
+                // Guardar el primero para mostrarlo en pantalla de inmediato
+                if (index === 0) {
+                    primerDatos = data;
+                    actualizarInterfaz(primerDatos);
+                    selectPaciente.value = keyName; // Seleccionarlo en el menú
+                }
+            } catch (error) {
+                console.error("Error al procesar el archivo JSON:", error);
+            }
+        };
+        lector.readAsText(archivo);
+    });
+
+    console.log(`Se procesaron ${archivos.length} archivos correctamente.`);
 }
 
 // 2. CARGA DESDE EL SELECTOR DE DEMO
@@ -59,9 +92,12 @@ function cargarPacienteSeleccionado(nombreArchivo) {
         actualizarInterfaz(pacientesDemo[nombreArchivo]);
     } else {
         fetch(`json_convertidos/${nombreArchivo}`)
-            .then(res => res.json())
+            .then(res => {
+                if (!res.ok) throw new Error("No encontrado");
+                return res.json();
+            })
             .then(data => actualizarInterfaz(data))
-            .catch(err => alert("No se pudo encontrar el archivo en la carpeta local."));
+            .catch(err => alert("No se pudo encontrar el archivo."));
     }
 }
 
