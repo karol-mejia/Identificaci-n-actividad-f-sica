@@ -8,10 +8,10 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-    <header class="header-container" style="display: flex; align-items: center; justify-content: space-between; padding: 15px 30px; background: #2c3e50; color: white; flex-wrap: wrap;">
+    <header class="header-container" style="display: flex; align-items: center; justify-content: space-between; padding: 15px 30px; background: #2c3e50; color: white;">
         <div style="display: flex; align-items: center; gap: 15px;">
-            <!-- Logo del proyecto -->
-            <img src="logo.jpeg" alt="Logo Proyecto" style="height: 55px; width: 55px; border-radius: 50%; object-fit: cover; border: 2px solid white;">
+            <!-- Contenedor del Logo -->
+            <img src="logo.jpeg" id="imgLogo" alt="Logo" style="height: 50px; width: 50px; border-radius: 50%; object-fit: cover; border: 2px solid #ffffff;" onerror="this.src='logo.jpg'; this.onerror=function(){this.src='logo.png';}">
             <div>
                 <h1 style="margin: 0; font-size: 20px;">Sistema Inteligente de Promoción de Actividad Física</h1>
                 <p style="margin: 0; font-size: 13px; color: #cbd5e1;">Análisis de Acelerometría y Machine Learning (Random Forest)</p>
@@ -21,61 +21,59 @@
 
     <main class="main-content" style="max-width: 1000px; margin: 20px auto; padding: 0 20px;">
         
-        <!-- Panel de Control (Selector de guardados + Subida manual) -->
-        <section class="control-panel" style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; justify-content: space-around; align-items: center; flex-wrap: wrap; gap: 15px; border: 1px solid #dee2e6;">
+        <!-- Panel de Control Doble: Subida Manual + Selector Demo -->
+        <section class="control-panel" style="background: #ffffff; padding: 20px; border-radius: 8px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
             
-            <!-- Opción A: Selector de pacientes guardados (Para la Demo) -->
-            <div>
-                <label for="selectPaciente" style="font-weight: bold; margin-right: 8px; color: #333; font-size: 14px;">Seleccionar Paciente (Demo):</label>
-                <select id="selectPaciente" onchange="cargarPacienteSeleccionado(this.value)" style="padding: 8px; font-size: 14px; border-radius: 4px; border: 1px solid #ccc;">
-                    <option value="">-- Elige un paciente --</option>
-                    <option value="d1p01M.json">Paciente d1p01M (Masculino)</option>
-                    <option value="d1p02F.json">Paciente d1p02F (Femenino)</option>
-                    <option value="d2p01M.json">Paciente d2p01M (S2 - Masculino)</option>
-                    <option value="d2p02F.json">Paciente d2p02F (S2 - Femenino)</option>
-                </select>
+            <!-- Opción 1: Subir cualquier archivo JSON de paciente -->
+            <div style="flex: 1; min-width: 250px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 5px; color: #1e293b; font-size: 14px;">📁 Cargar archivo de paciente (.json):</label>
+                <input type="file" id="fileInput" accept=".json" onchange="cargarArchivoManual(event)" style="width: 100%; padding: 6px; font-size: 14px; border: 1px solid #cbd5e1; border-radius: 4px;">
             </div>
 
-            <!-- Opción B: Botón para subir archivo JSON manual -->
-            <div>
-                <label for="fileInput" style="font-weight: bold; margin-right: 8px; color: #333; font-size: 14px;">O subir archivo:</label>
-                <input type="file" id="fileInput" accept=".json" onchange="cargarArchivoManual(event)" style="font-size: 14px;">
+            <!-- Opción 2: Selector de demo guardada -->
+            <div style="flex: 1; min-width: 250px;">
+                <label for="selectPaciente" style="display: block; font-weight: bold; margin-bottom: 5px; color: #1e293b; font-size: 14px;">⚡ Seleccionar Paciente Precargado (Demo):</label>
+                <select id="selectPaciente" onchange="cargarPacienteSeleccionado(this.value)" style="width: 100%; padding: 8px; font-size: 14px; border-radius: 4px; border: 1px solid #cbd5e1;">
+                    <option value="">-- Seleccionar de la lista --</option>
+                    <option value="d1p01M.json">Paciente d1p01M (Masculino)</option>
+                    <option value="d1p02F.json">Paciente d1p02F (Femenino)</option>
+                </select>
             </div>
 
         </section>
 
         <!-- Tarjetas de Resumen del Paciente -->
         <section class="dashboard-cards" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
-            <div class="card" style="background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center;">
-                <h3 style="margin: 0; color: #6c757d; font-size: 14px;">ID Paciente</h3>
-                <p id="txtId" style="font-size: 20px; font-weight: bold; color: #2c3e50; margin: 5px 0 0 0;">-</p>
+            <div class="card" style="background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); text-align: center; border: 1px solid #e2e8f0;">
+                <h3 style="margin: 0; color: #64748b; font-size: 13px; text-transform: uppercase;">ID Paciente</h3>
+                <p id="txtId" style="font-size: 22px; font-weight: bold; color: #1e293b; margin: 5px 0 0 0;">-</p>
             </div>
-            <div class="card" style="background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center;">
-                <h3 style="margin: 0; color: #6c757d; font-size: 14px;">Género</h3>
-                <p id="txtGenero" style="font-size: 20px; font-weight: bold; color: #2c3e50; margin: 5px 0 0 0;">-</p>
+            <div class="card" style="background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); text-align: center; border: 1px solid #e2e8f0;">
+                <h3 style="margin: 0; color: #64748b; font-size: 13px; text-transform: uppercase;">Género</h3>
+                <p id="txtGenero" style="font-size: 22px; font-weight: bold; color: #1e293b; margin: 5px 0 0 0;">-</p>
             </div>
-            <div class="card" style="background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center;">
-                <h3 style="margin: 0; color: #6c757d; font-size: 14px;">Puntuación Total</h3>
-                <p id="txtScore" style="font-size: 20px; font-weight: bold; color: #27ae60; margin: 5px 0 0 0;">0 pts</p>
+            <div class="card" style="background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); text-align: center; border: 1px solid #e2e8f0;">
+                <h3 style="margin: 0; color: #64748b; font-size: 13px; text-transform: uppercase;">Puntuación Total</h3>
+                <p id="txtScore" style="font-size: 22px; font-weight: bold; color: #16a34a; margin: 5px 0 0 0;">0 pts</p>
             </div>
-            <div class="card" style="background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center;">
-                <h3 style="margin: 0; color: #6c757d; font-size: 14px;">Insignia Evaluada</h3>
-                <p id="txtBadge" style="font-size: 16px; font-weight: bold; color: #d35400; margin: 5px 0 0 0;">-</p>
+            <div class="card" style="background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); text-align: center; border: 1px solid #e2e8f0;">
+                <h3 style="margin: 0; color: #64748b; font-size: 13px; text-transform: uppercase;">Insignia Evaluada</h3>
+                <p id="txtBadge" style="font-size: 16px; font-weight: bold; color: #ea580c; margin: 5px 0 0 0;">-</p>
             </div>
         </section>
 
-        <!-- Caja de Retroalimentación y Motivación -->
-        <section class="motivation-box" style="background: #e8f4fd; padding: 15px; border-left: 5px solid #2980b9; margin-bottom: 20px; border-radius: 4px;">
-            <h3 style="margin: 0 0 5px 0; color: #2980b9;">Mensaje del Sistema Inteligente</h3>
-            <p id="txtMensaje" style="margin: 0; color: #333;">Selecciona un paciente o sube un archivo JSON para ver su evaluación kinemática.</p>
+        <!-- Mensaje de Motivación -->
+        <section class="motivation-box" style="background: #f0f9ff; padding: 15px; border-left: 5px solid #0284c7; margin-bottom: 20px; border-radius: 4px;">
+            <h3 style="margin: 0 0 5px 0; color: #0369a1; font-size: 16px;">Mensaje del Sistema Inteligente</h3>
+            <p id="txtMensaje" style="margin: 0; color: #334155;">Sube un archivo JSON o selecciona un paciente de la lista para procesar.</p>
         </section>
 
         <!-- Desglose de Parámetros de Actividad -->
-        <section class="breakdown-section" style="background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-            <h2 style="margin-top: 0; color: #2c3e50; font-size: 18px;">Desglose de Parámetros de Actividad</h2>
-            <p style="font-size: 13px; color: #666;">Parámetros evaluados: Sentado en la cama, Sentado en la silla, Acostado en la cama, y Deambulando (incluye estar de pie y caminar por la habitación).</p>
-            <div id="tablaDesglose" style="overflow-x: auto; margin-top: 15px;">
-                <p style="color: #999; text-align: center;">Esperando selección de datos...</p>
+        <section class="breakdown-section" style="background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 1px solid #e2e8f0;">
+            <h2 style="margin-top: 0; color: #1e293b; font-size: 18px;">Desglose de Parámetros de Actividad</h2>
+            <p style="font-size: 13px; color: #64748b; margin-bottom: 15px;">Parámetros evaluados: Sentado en la cama, Sentado en la silla, Acostado en la cama, y Deambulando (incluye estar de pie y caminar por la habitación).</p>
+            <div id="tablaDesglose" style="overflow-x: auto;">
+                <p style="color: #94a3b8; text-align: center; padding: 20px 0;">Esperando selección de datos...</p>
             </div>
         </section>
     </main>
