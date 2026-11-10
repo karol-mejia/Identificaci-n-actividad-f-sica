@@ -145,17 +145,32 @@ function cargarPacienteSeleccionado(nombreArchivo) {
     }
 }
 
+// ACTUALIZACIÓN VISUAL FLEXIBLE (Compatible con cualquier estructura de JSON)
 function actualizarInterfaz(data) {
-    document.getElementById('txtId').textContent = data.id || "N/D";
-    document.getElementById('txtGenero').textContent = data.gender || "N/D";
-    document.getElementById('txtScore').textContent = (data.score || 0) + " pts";
-    document.getElementById('txtBadge').textContent = data.badge || "Sin insignia";
-    document.getElementById('txtMensaje').textContent = data.motivationMessage || "Sin mensaje.";
+    if (!data) return;
+    console.log("Datos recibidos en la interfaz:", data);
+
+    // Extraer valores buscando múltiples nombres posibles para las llaves del JSON
+    const id = data.id || data.paciente_id || data.patientId || "N/D";
+    const genero = data.gender || data.genero || "N/D";
+    const score = data.score || data.puntuacion || data.totalScore || data.puntos || 0;
+    const badge = data.badge || data.insignia || "Nivel Evaluado";
+    const mensaje = data.motivationMessage || data.mensaje || data.message || "Análisis completado con éxito.";
+
+    // Pintar tarjetas superiores
+    document.getElementById('txtId').textContent = id;
+    document.getElementById('txtGenero').textContent = genero;
+    document.getElementById('txtScore').textContent = score + " pts";
+    document.getElementById('txtBadge').textContent = badge;
+    document.getElementById('txtMensaje').textContent = mensaje;
 
     const contenedorTabla = document.getElementById('tablaDesglose');
     
-    if (!data.activityBreakdown || data.activityBreakdown.length === 0) {
-        contenedorTabla.innerHTML = "<p style='color: #64748b; padding: 10px 0;'>No se encontraron parámetros de actividad.</p>";
+    // Buscar el desglose de actividades sin importar cómo se llame la propiedad en el JSON
+    const desglose = data.activityBreakdown || data.desglose || data.actividades || data.breakdown || [];
+    
+    if (!Array.isArray(desglose) || desglose.length === 0) {
+        contenedorTabla.innerHTML = "<p style='color: #64748b; padding: 10px 0;'>El archivo JSON no contiene una lista de actividades válida.</p>";
         return;
     }
 
@@ -173,14 +188,21 @@ function actualizarInterfaz(data) {
             <tbody>
     `;
 
-    data.activityBreakdown.forEach(act => {
+    desglose.forEach(act => {
+        // Mapear campos flexibles para cada actividad
+        const nombreAct = act.activity || act.nombre || act.actividad || "Parámetro";
+        const recs = act.records || act.registros || act.count || 0;
+        const tiempo = act.time || act.tiempo || "0 s";
+        const porc = act.percentage || act.porcentaje || "0%";
+        const pts = act.points || act.puntos || "+0 pts";
+
         htmlTabla += `
             <tr style="border-bottom: 1px solid #f1f5f9;">
-                <td style="padding: 12px; font-weight: 500; color: #1e293b;">${act.activity}</td>
-                <td style="padding: 12px; color: #475569;">${act.records}</td>
-                <td style="padding: 12px; color: #475569;">${act.time}</td>
-                <td style="padding: 12px; color: #475569;">${act.percentage}</td>
-                <td style="padding: 12px; font-weight: bold; color: #16a34a;">${act.points}</td>
+                <td style="padding: 12px; font-weight: 500; color: #1e293b;">${nombreAct}</td>
+                <td style="padding: 12px; color: #475569;">${recs}</td>
+                <td style="padding: 12px; color: #475569;">${tiempo}</td>
+                <td style="padding: 12px; color: #475569;">${porc}</td>
+                <td style="padding: 12px; font-weight: bold; color: #16a34a;">${pts}</td>
             </tr>
         `;
     });
