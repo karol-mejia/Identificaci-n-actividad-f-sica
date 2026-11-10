@@ -27,7 +27,7 @@
             <!-- Opción 1: Subir cualquier archivo JSON de paciente -->
             <div style="flex: 1; min-width: 250px;">
                 <label style="display: block; font-weight: bold; margin-bottom: 5px; color: #1e293b; font-size: 14px;">📁 Cargar archivo de paciente (.json):</label>
-                <input type="file" id="fileInput" accept=".json" onchange="cargarArchivoManual(event)" style="width: 100%; padding: 6px; font-size: 14px; border: 1px solid #cbd5e1; border-radius: 4px;">
+                <input type="file" id="fileInput" accept=".json" multiple onchange="cargarArchivoManual(event)" style="width: 100%; padding: 6px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; background: #fafafa;">
             </div>
 
             <!-- Opción 2: Selector de demo guardada -->
